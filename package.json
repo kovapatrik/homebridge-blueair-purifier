@@ -1,16 +1,16 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
-  "version": "1.0.0",
-  "description": "A short description about what your plugin does.",
+  "displayName": "Homebridge BlueAir Platform",
+  "name": "homebridge-blueair-purifier",
+  "version": "0.1.0",
+  "description": "Homebridge plugin for BlueAir purifiers",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "git+https://github.com/kovapatrik/homebridge-blueair-purifier.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/kovapatrik/homebridge-blueair-purifier/issues"
   },
   "engines": {
     "node": "^18.17.0 || ^20.9.0",

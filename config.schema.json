@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "BlueAirPlatform",
   "pluginType": "platform",
   "singular": true,
   "schema": {
