@@ -5,12 +5,117 @@
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
+      "username": {
+        "title": "Username",
+        "description": "Username for BlueAir account",
         "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+        "required": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for BlueAir account",
+        "type": "string",
+        "required": true
+      },
+      "verboseLogging": {
+        "title": "Verbose Logging",
+        "description": "Enable to receive detailed log messages. Useful for troubleshooting.",
+        "type": "boolean"
+      },
+      "devices": {
+        "title": "Devices",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "required": true
+            },
+            "id": {
+              "title": "ID",
+              "type": "string",
+              "required": true
+            },
+            "isAWSDevice": {
+              "title": "AWS Device",
+              "description": "Enable AWS integration. This is required for devices like DustMagnet, HealthProtect, and Blue Pure.",
+              "type": "boolean"
+            },
+            "led": {
+              "title": "LED",
+              "description": "Toggles if the LED switch service is created with the accessory.",
+              "type": "boolean"
+            },
+            "airQualitySensor": {
+              "title": "Air Quality Sensor",
+              "description": "Toggles if the air quality sensor service is created with the accessory.",
+              "type": "boolean"
+            },
+            "co2Sensor": {
+              "title": "CO2 Sensor",
+              "description": "Toggles if the CO2 sensor service is created with the accessory.",
+              "type": "boolean"
+            },
+            "temperatureSensor": {
+              "title": "Temperature Sensor",
+              "description": "Toggles if the temperature sensor service is created with the accessory.",
+              "type": "boolean"
+            },
+            "humiditySensor": {
+              "title": "Humidity Sensor",
+              "description": "Toggles if the humidity sensor service is created with the accessory.",
+              "type": "boolean"
+            },
+            "germShield": {
+              "title": "Germ Shield",
+              "description": "Toggles if the germ shield switch service is created with the accessory.",
+              "type": "boolean"
+            },
+            "nightMode": {
+              "title": "Night Mode",
+              "description": "Toggles if the night mode switch service is created with the accessory.",
+              "type": "boolean"
+            }
+          }
+        }
       }
     }
-  }
+  },
+  "layout": [
+    {
+      "items": [
+        {
+          "ref": "common",
+          "type": "fieldset",
+          "expandable": true,
+          "expanded": true,
+          "title": "Common Settings",
+          "items": [
+            "username",
+            "password",
+            "verboseLogging"
+          ]
+        },
+        {
+          "key": "devices",
+          "type": "tabarray",
+          "title": "{{ value.name || 'new device' }}",
+          "items": [
+            "devices[].name",
+            "devices[].id",
+            "devices[].enableAWS",
+            "devices[].led",
+            "devices[].airQualitySensor",
+            "devices[].co2Sensor",
+            "devices[].temperatureSensor",
+            "devices[].humiditySensor",
+            "devices[].germShield",
+            "devices[].nightMode"
+          ]
+        }
+      ]
+    }
+  ]
 }
