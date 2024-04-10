@@ -1,7 +1,7 @@
 export type Config = {
   verboseLogging: boolean;
-  oauthToken: string;
-  oauthTokenSecret: string;
+  username: string;
+  password: string;
   region: Region;
   devices: DeviceConfig[];
 };
@@ -9,7 +9,6 @@ export type Config = {
 export type DeviceConfig = {
   id: string;
   name: string;
-  isAWSDevice: boolean;
   led: boolean;
   airQualitySensor: boolean;
   co2Sensor: boolean;
@@ -20,18 +19,17 @@ export type DeviceConfig = {
 };
 
 export enum Region {
+  EU = 'Default (all other regions)',
   US = 'USA',
-  EU = 'Europe',
-  CA = 'Canada',
   CN = 'China',
+  AU = 'Australia',
+  RU = 'Russia',
 }
 
 export const RegionMap = {
   [Region.US]: 'us',
-  [Region.EU]: 'eu',
-  [Region.CA]: 'eu',
   [Region.CN]: 'cn',
+  [Region.EU]: 'eu',
+  [Region.AU]: 'au',
+  [Region.RU]: 'ru',
 };
-
-export const LOGIN_EXPIRATION = 3600 * 1000 * 12; // n hours in milliseconds
-export const DEVICE_UPDATE_INTERVAL = 1000 * 5; // n seconds in milliseconds
