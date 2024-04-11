@@ -1,10 +1,10 @@
 export type Config = {
-  verboseLogging: boolean;
-  uiDebug: boolean;
   username: string;
   password: string;
-  accountUuid: string;
   region: Region;
+  accountUuid: string;
+  verboseLogging: boolean;
+  uiDebug: boolean;
   devices: DeviceConfig[];
 };
 
