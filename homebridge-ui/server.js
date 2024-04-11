@@ -1,6 +1,6 @@
 const { HomebridgePluginUiServer, RequestError } = require('@homebridge/plugin-ui-utils');
 const { defaultConfig, defaultDeviceConfig } = require('../dist/platformUtils.js');
-const { BlueAirAwsApi } = require('../dist/api/BlueAirAwsApi.js').default;
+const BlueAirAwsApi = require('../dist/api/BlueAirAwsApi.js').default;
 
 var _ = require('lodash');
 
