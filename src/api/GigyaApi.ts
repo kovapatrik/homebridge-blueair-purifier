@@ -38,7 +38,7 @@ export default class GigyaApi {
     const response = await this.apiCall('/accounts.login', params.toString());
 
     if (!response.data.oauth_token || !response.data.oauth_token_secret) {
-      throw new Error('Gigya session error: no oauth_token or oauth_token_secret in response');
+      throw new Error(`Gigya session error: no oauth_token or oauth_token_secret in response: ${JSON.stringify(response.data)}`);
     }
 
     this.logger.debug('Gigya session received');
@@ -58,7 +58,7 @@ export default class GigyaApi {
     const response = await this.apiCall('/accounts.getJWT', params.toString());
 
     if (!response.data.id_token) {
-      throw new Error('Gigya JWT error: no id_token in response');
+      throw new Error(`Gigya JWT error: no id_token in response: ${JSON.stringify(response.data)}`);
     }
 
     this.logger.debug('Gigya JWT received');
