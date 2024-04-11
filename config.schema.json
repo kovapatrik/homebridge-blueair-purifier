@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "BlueAirPlatform",
+  "pluginAlias": "blueair-purifier",
   "pluginType": "platform",
   "singular": true,
   "schema": {

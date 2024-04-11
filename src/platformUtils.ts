@@ -1,7 +1,9 @@
 export type Config = {
   verboseLogging: boolean;
+  uiDebug: boolean;
   username: string;
   password: string;
+  accountUuid: string;
   region: Region;
   devices: DeviceConfig[];
 };
@@ -20,10 +22,10 @@ export type DeviceConfig = {
 
 export enum Region {
   EU = 'Default (all other regions)',
-  US = 'USA',
-  CN = 'China',
   AU = 'Australia',
+  CN = 'China',
   RU = 'Russia',
+  US = 'USA',
 }
 
 export const RegionMap = {
@@ -32,4 +34,26 @@ export const RegionMap = {
   [Region.EU]: 'eu',
   [Region.AU]: 'au',
   [Region.RU]: 'ru',
+};
+
+export const defaultConfig: Config = {
+  uiDebug: false,
+  verboseLogging: false,
+  username: '',
+  password: '',
+  accountUuid: '',
+  region: Region.EU,
+  devices: [],
+};
+
+export const defaultDeviceConfig: DeviceConfig = {
+  id: '',
+  name: '',
+  led: false,
+  airQualitySensor: false,
+  co2Sensor: false,
+  temperatureSensor: false,
+  humiditySensor: false,
+  germShield: false,
+  nightMode: false,
 };

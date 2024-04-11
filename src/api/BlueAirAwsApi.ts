@@ -1,7 +1,7 @@
 import { Logger } from 'homebridge';
 import { RegionMap } from '../platformUtils';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import { GigyaApi } from './GigyaApi';
+import GigyaApi from './GigyaApi';
 import { BLUEAIR_API_TIMEOUT, BLUEAIR_CONFIG, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION } from './Consts';
 
 type BlueAirDeviceDiscovery = {
@@ -14,7 +14,7 @@ type BlueAirDeviceDiscovery = {
   'wifi-firmware': string;
 };
 
-type BlueAirDeviceState = {
+export type BlueAirDeviceState = {
   cfv?: string;
   germshield?: boolean;
   gsnm?: boolean;
@@ -32,7 +32,7 @@ type BlueAirDeviceState = {
   disinftime?: number;
 };
 
-type BlueAirDeviceSensorData = {
+export type BlueAirDeviceSensorData = {
   fanspeed?: number;
   hcho?: number;
   humidity?: number;
@@ -43,11 +43,17 @@ type BlueAirDeviceSensorData = {
   voc?: number;
 };
 
-type BlueAirDeviceStatus = {
+export type BlueAirDeviceStatus = {
   id: string;
   name: string;
   state: BlueAirDeviceState;
   sensorData: BlueAirDeviceSensorData;
+};
+
+type BlueAirSetStateBody = {
+  n: string;
+  v?: number;
+  vb?: boolean;
 };
 
 export const BlueAirDeviceSensorDataMap = {
@@ -61,7 +67,7 @@ export const BlueAirDeviceSensorDataMap = {
   tVOC: 'voc',
 };
 
-export class BlueAirAwsApi {
+export default class BlueAirAwsApi {
 
   private readonly gigyaApi: GigyaApi;
   private readonly blueairAxios: AxiosInstance;
@@ -161,10 +167,24 @@ export class BlueAirAwsApi {
     return deviceStatuses;
   }
 
-  async setDeviceStatus(uuid: string, status: Record<string, unknown>): Promise<boolean> {
+  async setDeviceStatus(uuid: string, state: keyof BlueAirDeviceState, value: number | boolean): Promise<void> {
     await this.checkTokenExpiration();
-    this.logger.debug(`setDeviceStatus: ${uuid} ${JSON.stringify(status)}`);
-    return true;
+
+    this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);
+
+    const body : BlueAirSetStateBody = {
+      n: state,
+    };
+
+    if (typeof value === 'number') {
+      body.v = value;
+    } else if (typeof value === 'boolean') {
+      body.vb = value;
+    } else {
+      throw new Error(`setDeviceStatus: unknown value type ${typeof value}`);
+    }
+
+    await this.apiCall(`/${uuid}/a/${state}`, body);
   }
 
   private async getAwsAccessToken(jwt: string): Promise<{accessToken: string}> {

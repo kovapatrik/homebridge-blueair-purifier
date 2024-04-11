@@ -3,7 +3,7 @@ import { Logger } from 'homebridge';
 import { BLUEAIR_CONFIG } from './Consts';
 import { RegionMap } from '../platformUtils';
 
-export class GigyaApi {
+export default class GigyaApi {
 
   private api_key: string;
   private readonly gigyaAxios: AxiosInstance;
@@ -14,7 +14,6 @@ export class GigyaApi {
     region: string,
     private readonly logger: Logger,
   ) {
-
     const config = BLUEAIR_CONFIG[RegionMap[region]].gigyaConfig;
     this.api_key = config.apiKey;
 

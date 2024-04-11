@@ -1,5 +1,4 @@
 {
-  "private": true,
   "displayName": "Homebridge BlueAir Platform",
   "name": "homebridge-blueair-purifier",
   "version": "0.1.0",
@@ -27,6 +26,7 @@
     "homebridge-plugin"
   ],
   "devDependencies": {
+    "@types/lodash": "^4.17.0",
     "@types/node": "^20.12.5",
     "@typescript-eslint/eslint-plugin": "^7.5.0",
     "@typescript-eslint/parser": "^7.5.0",
@@ -38,6 +38,8 @@
     "typescript": "^5.4.4"
   },
   "dependencies": {
-    "axios": "^1.6.8"
+    "@homebridge/plugin-ui-utils": "^1.0.3",
+    "axios": "^1.6.8",
+    "lodash": "^4.17.21"
   }
 }
