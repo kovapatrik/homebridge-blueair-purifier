@@ -20,7 +20,8 @@
         "description": "Region for BlueAir account. This should be filled in autometically in the discovery process.",
         "type": "string",
         "enum": ["Default (all other regions)", "Australia", "China", "Russia", "USA"],
-        "default": "Default (all other regions)"
+        "default": "Default (all other regions)",
+        "required": true
       },
       "accountUuid": {
         "title": "Account UUID",
