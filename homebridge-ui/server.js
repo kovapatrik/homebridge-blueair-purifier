@@ -96,6 +96,7 @@ class UiServer extends HomebridgePluginUiServer {
         return devices;
       } catch (e) {
         const msg = e instanceof Error ? e.stack : e;
+        this.logger.error(`Device discovery failed:\n${msg}`);
         throw new RequestError(`Device discovery failed:\n${msg}`);
       }
     });
@@ -105,6 +106,7 @@ class UiServer extends HomebridgePluginUiServer {
         return await this.api.getDeviceStatus(accountUuid, uuids);
       } catch (e) {
         const msg = e instanceof Error ? e.stack : e;
+        this.logger.error(`Failed to get initial device states:\n${msg}`);
         throw new RequestError(`Failed to get initial device states:\n${msg}`);
       }
     });
