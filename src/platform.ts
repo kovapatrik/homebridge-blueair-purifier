@@ -27,8 +27,8 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.platformConfig = defaultsDeep(config, defaultConfig);
 
     if (!this.platformConfig.username || !this.platformConfig.password || !this.platformConfig.accountUuid) {
-      this.log.error('Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
-      config.json file');
+      this.log.error(`Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
+      config.json file`);
     }
 
     this.blueAirApi = new BlueAirAwsApi(this.platformConfig.username, this.platformConfig.password, this.platformConfig.region, log);
