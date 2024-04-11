@@ -36,21 +36,17 @@ export class GigyaApi {
       targetEnv: 'mobile',
     });
 
-    try {
-      const response = await this.apiCall('/accounts.login', params.toString());
+    const response = await this.apiCall('/accounts.login', params.toString());
 
-      if (!response.data.oauth_token || !response.data.oauth_token_secret) {
-        throw new Error('Gigya session error: no oauth_token or oauth_token_secret in response');
-      }
-
-      this.logger.debug('Gigya session received');
-      return {
-        token: response.data.oauth_token,
-        secret: response.data.oauth_token_secret,
-      };
-    } catch (error) {
-      throw new Error(`Gigya session error: ${error}`);
+    if (!response.data.oauth_token || !response.data.oauth_token_secret) {
+      throw new Error('Gigya session error: no oauth_token or oauth_token_secret in response');
     }
+
+    this.logger.debug('Gigya session received');
+    return {
+      token: response.data.oauth_token,
+      secret: response.data.oauth_token_secret,
+    };
   }
 
   public async getGigyaJWT(token: string, secret: string): Promise<{jwt: string}> {
@@ -60,20 +56,16 @@ export class GigyaApi {
       targetEnv: 'mobile',
     });
 
-    try {
-      const response = await this.apiCall('/accounts.getJWT', params.toString());
+    const response = await this.apiCall('/accounts.getJWT', params.toString());
 
-      if (!response.data.id_token) {
-        throw new Error('Gigya JWT error: no id_token in response');
-      }
-
-      this.logger.debug('Gigya JWT received');
-      return {
-        jwt: response.data.id_token,
-      };
-    } catch (error) {
-      throw new Error(`Gigya JWT error: ${error}`);
+    if (!response.data.id_token) {
+      throw new Error('Gigya JWT error: no id_token in response');
     }
+
+    this.logger.debug('Gigya JWT received');
+    return {
+      jwt: response.data.id_token,
+    };
   }
 
   private async apiCall(url: string, data: string | object, retries = 3): Promise<AxiosResponse> {
