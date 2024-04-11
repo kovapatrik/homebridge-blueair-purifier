@@ -181,7 +181,7 @@
  
        console.info(`Request login...`);
        try {
-          const devices = await homebridge.request('/disover', { username, password, region });
+          const devices = await homebridge.request('/discover', { username, password, region });
           debugLog(`Discovered devices:\n${JSON.stringify(devices, null, 2)}`);
           const table = document.getElementById('discoverTable').getElementsByTagName('tbody')[0];
           table.innerHTML = '';
