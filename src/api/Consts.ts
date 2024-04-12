@@ -63,8 +63,9 @@ export const BLUEAIR_CONFIG = Object.values(RegionMap).reduce((acc, region: stri
   },
 }), {} as APIConfig);
 
+
 export const LOGIN_EXPIRATION = 3600 * 1000 * 24; // n hours in milliseconds
-export const BLUEAIR_API_TIMEOUT = 1000 * 5; // n seconds in milliseconds
+export const BLUEAIR_API_TIMEOUT = 5 * 1000; // n seconds in milliseconds
 
 export type BlueAirDeviceStatusResponse = {
   deviceInfo: {

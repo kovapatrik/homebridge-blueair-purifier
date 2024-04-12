@@ -27,23 +27,18 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.platformConfig = defaultsDeep(config, defaultConfig);
 
     if (!this.platformConfig.username || !this.platformConfig.password || !this.platformConfig.accountUuid) {
-      this.log.error('Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
-      config.json file');
+      this.log.error(`Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
+      config.json file`);
     }
 
     this.blueAirApi = new BlueAirAwsApi(this.platformConfig.username, this.platformConfig.password, this.platformConfig.region, log);
 
     this.api.on('didFinishLaunching', async () => {
       await this.getInitialDeviceStates();
-    });
 
-    this.on('setState', async ({id, state, value}) => {
-      this.log.info(`[${id}] Setting state: ${state} = ${value}`);
-      try {
-        await this.blueAirApi.setDeviceStatus(id, state, value);
-      } catch (error) {
-        this.log.error(`[${id}] Error setting state: ${state} = ${value}`, error);
-      }
+      // setInterval(async () => {
+      //   await this.getInitialDeviceStates();
+      // }, this.platformConfig.pollingInterval * 1000);
     });
 
   }
@@ -54,6 +49,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
   }
+
 
   async getInitialDeviceStates() {
     try {
@@ -69,6 +65,8 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       for (const uuid of uuids) {
         this.log.warn(`[${uuid}] Device not found in AWS API response!`);
       }
+
+      this.log.info('All configured devices have been added!');
     } catch (error) {
       this.log.error('Error getting initial device states:', error);
     }
@@ -84,7 +82,16 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       return;
     }
 
-    const blueAirDevice = new BlueAirDevice(device.id);
+    const blueAirDevice = new BlueAirDevice(device);
+
+    blueAirDevice.on('setState', async ({id, state, value}) => {
+      this.log.info(`[${id}] Setting state: ${state} = ${value}`);
+      try {
+        await this.blueAirApi.setDeviceStatus(id, state, value);
+      } catch (error) {
+        this.log.error(`[${id}] Error setting state: ${state} = ${value}`, error);
+      }
+    });
 
     if (existingAccessory) {
       this.log.info(`[${deviceConfig.name}] Restoring existing accessory from cache: ${existingAccessory.displayName}`);

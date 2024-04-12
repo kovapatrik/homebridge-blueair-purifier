@@ -15,6 +15,9 @@ export default class GigyaApi {
     private readonly logger: Logger,
   ) {
     const config = BLUEAIR_CONFIG[RegionMap[region]].gigyaConfig;
+
+    this.logger.debug(`Creating Gigya API instance with config: ${JSON.stringify(config)} and username: ${username} and region: ${region}`);
+
     this.api_key = config.apiKey;
 
     this.gigyaAxios = axios.create({
@@ -37,14 +40,14 @@ export default class GigyaApi {
 
     const response = await this.apiCall('/accounts.login', params.toString());
 
-    if (!response.data.oauth_token || !response.data.oauth_token_secret) {
-      throw new Error('Gigya session error: no oauth_token or oauth_token_secret in response');
+    if (!response.data.sessionInfo) {
+      throw new Error(`Gigya session error: sessionInfo in response: ${JSON.stringify(response.data)}`);
     }
 
     this.logger.debug('Gigya session received');
     return {
-      token: response.data.oauth_token,
-      secret: response.data.oauth_token_secret,
+      token: response.data.sessionInfo.sessionToken,
+      secret: response.data.sessionInfo.sessionSecret,
     };
   }
 
@@ -58,7 +61,7 @@ export default class GigyaApi {
     const response = await this.apiCall('/accounts.getJWT', params.toString());
 
     if (!response.data.id_token) {
-      throw new Error('Gigya JWT error: no id_token in response');
+      throw new Error(`Gigya JWT error: no id_token in response: ${JSON.stringify(response.data)}`);
     }
 
     this.logger.debug('Gigya JWT received');

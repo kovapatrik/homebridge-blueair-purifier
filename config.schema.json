@@ -1,25 +1,42 @@
 {
   "pluginAlias": "blueair-purifier",
   "pluginType": "platform",
+  "customUi": true,
   "singular": true,
   "schema": {
     "type": "object",
     "properties": {
       "username": {
         "title": "Username",
-        "description": "Username for BlueAir account",
-        "type": "string",
-        "required": true
+        "description": "Username for BlueAir account. This should be filled in autometically in the discovery process.",
+        "type": "string"
       },
       "password": {
         "title": "Password",
-        "description": "Password for BlueAir account",
+        "description": "Password for BlueAir account. This should be filled in autometically in the discovery process.",
+        "type": "string"
+      },
+      "region": {
+        "title": "Region",
+        "description": "Region for BlueAir account. This should be filled in autometically in the discovery process.",
         "type": "string",
+        "enum": ["Default (all other regions)", "Australia", "China", "Russia", "USA"],
+        "default": "Default (all other regions)",
         "required": true
+      },
+      "accountUuid": {
+        "title": "Account UUID",
+        "description": "Account UUID for BlueAir account. This should be filled in autometically in the discovery process.",
+        "type": "string"
       },
       "verboseLogging": {
         "title": "Verbose Logging",
         "description": "Enable to receive detailed log messages. Useful for troubleshooting.",
+        "type": "boolean"
+      },
+      "uiDebug": {
+        "title": "UI Debug",
+        "description": "Enable to show debug information in the Homebridge UI.",
         "type": "boolean"
       },
       "devices": {
@@ -37,11 +54,6 @@
               "title": "ID",
               "type": "string",
               "required": true
-            },
-            "isAWSDevice": {
-              "title": "AWS Device",
-              "description": "Enable AWS integration. This is required for devices like DustMagnet, HealthProtect, and Blue Pure.",
-              "type": "boolean"
             },
             "led": {
               "title": "LED",
@@ -95,7 +107,10 @@
           "items": [
             "username",
             "password",
-            "verboseLogging"
+            "region",
+            "accountUuid",
+            "verboseLogging",
+            "uiDebug"
           ]
         },
         {
@@ -105,7 +120,6 @@
           "items": [
             "devices[].name",
             "devices[].id",
-            "devices[].enableAWS",
             "devices[].led",
             "devices[].airQualitySensor",
             "devices[].co2Sensor",

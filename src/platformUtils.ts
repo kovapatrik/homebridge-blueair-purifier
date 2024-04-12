@@ -1,10 +1,11 @@
 export type Config = {
-  verboseLogging: boolean;
-  uiDebug: boolean;
   username: string;
   password: string;
-  accountUuid: string;
   region: Region;
+  accountUuid: string;
+  verboseLogging: boolean;
+  uiDebug: boolean;
+  pollingInterval: number;
   devices: DeviceConfig[];
 };
 
@@ -43,6 +44,7 @@ export const defaultConfig: Config = {
   password: '',
   accountUuid: '',
   region: Region.EU,
+  pollingInterval: 5,
   devices: [],
 };
 

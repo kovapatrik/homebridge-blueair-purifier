@@ -6,16 +6,15 @@ export class BlueAirDevice extends EventEmitter {
   public state: BlueAirDeviceState;
   public sensorData: BlueAirDeviceSensorData;
 
+  private readonly id: string;
+
   constructor(
-    private readonly id: string,
+    device: BlueAirDeviceStatus,
   ) {
     super();
-    this.state = {};
-    this.sensorData = {};
-
-    this.on('state', (state) => {
-      this.updateState(state);
-    });
+    this.id = device.id;
+    this.state = device.state;
+    this.sensorData = device.sensorData;
   }
 
   public setState(state: string, value: number | boolean | string) {

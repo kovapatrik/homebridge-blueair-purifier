@@ -33,6 +33,7 @@
                 <option value="China">China</option>
                 <option value="Russia">Russia</option>
                 <option value="USA">USA</option>
+              </select>
            </div>
            <button class="btn btn-primary btn-login" type="submit" id="discoverBtn" style="border: 0;">
              Discover Devices on account
@@ -42,9 +43,9 @@
            <table class="table table-sm" id="discoverTable">
              <thead>
                <tr>
+                 <th scope="col">Name</th>
                  <th scope="col">Id</th>
                  <th scope="col">Mac</th>
-                 <th scope="col">Account UUID</th>
                  <th scope="col">Add&nbsp;/&nbsp;Update</th>
                </tr>
              </thead>
@@ -180,7 +181,7 @@
  
        console.info(`Request login...`);
        try {
-          const devices = await homebridge.request('/disover', { username, password, region });
+          const devices = await homebridge.request('/discover', { username, password, region });
           debugLog(`Discovered devices:\n${JSON.stringify(devices, null, 2)}`);
           const table = document.getElementById('discoverTable').getElementsByTagName('tbody')[0];
           table.innerHTML = '';
@@ -206,11 +207,11 @@
               const state = initialStates.find((s) => s.id === device.uuid);
               const tr = table.insertRow();
               const td = tr.insertCell();
-              td.appendChild(document.createTextNode(device.uuid));
+              td.appendChild(document.createTextNode(state.name));
               td.setAttribute('scope', 'row');
     
+              tr.insertCell().appendChild(document.createTextNode(device.uuid));
               tr.insertCell().appendChild(document.createTextNode(device.mac));
-              tr.insertCell().appendChild(document.createTextNode(device.name));
 
               const addCell = tr.insertCell();
               if (currentConfig.devices.find((d) => d.id === device.uuid)) {

@@ -82,6 +82,9 @@ export default class BlueAirAwsApi {
   ) {
     const config = BLUEAIR_CONFIG[RegionMap[region]].awsConfig;
 
+    this.logger.debug(`Creating BlueAir API instance with config: ${JSON.stringify(config)} and username: ${username}\
+    and region: ${region}`);
+
     this.gigyaApi = new GigyaApi(username, password, region, logger);
     this.blueairAxios = axios.create({
       baseURL: `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`,
@@ -98,6 +101,8 @@ export default class BlueAirAwsApi {
 
   async login(): Promise<void> {
 
+    this.logger.debug('Logging in...');
+
     const { token, secret } = await this.gigyaApi.getGigyaSession();
     const { jwt } = await this.gigyaApi.getGigyaJWT(token, secret);
     const { accessToken } = await this.getAwsAccessToken(jwt);
@@ -105,10 +110,13 @@ export default class BlueAirAwsApi {
     this.last_login = Date.now();
     this.blueairAxios.defaults.headers['Authorization'] = `Bearer ${accessToken}`;
     this.blueairAxios.defaults.headers['idtoken'] = accessToken;
+
+    this.logger.debug('Logged in');
   }
 
   async checkTokenExpiration(): Promise<void> {
     if (LOGIN_EXPIRATION < Date.now() - this.last_login) {
+      this.logger.debug('Token expired, logging in again');
       return await this.login();
     }
     return;
@@ -117,7 +125,9 @@ export default class BlueAirAwsApi {
   async getDevices(): Promise<BlueAirDeviceDiscovery[]> {
     await this.checkTokenExpiration();
 
-    const response = await this.apiCall('/registered-devices', undefined);
+    this.logger.debug('Getting devices...');
+
+    const response = await this.apiCall('/registered-devices', undefined, 'GET');
 
     if (!response.data.devices) {
       throw new Error('getDevices error: no devices in response');
@@ -152,9 +162,9 @@ export default class BlueAirAwsApi {
           return acc;
         }, {} as BlueAirDeviceSensorData),
         state: device.states.reduce((acc, state) => {
-          if (state.v) {
+          if (state.v !== undefined) {
             acc[state.n] = state.v;
-          } else if (state.vb) {
+          } else if (state.vb !== undefined) {
             acc[state.n] = state.vb;
           } else {
             this.logger.warn(`getDeviceStatus: unknown state ${JSON.stringify(state)}`);
@@ -184,13 +194,14 @@ export default class BlueAirAwsApi {
       throw new Error(`setDeviceStatus: unknown value type ${typeof value}`);
     }
 
-    await this.apiCall(`/${uuid}/a/${state}`, body);
+    const response = await this.apiCall(`/${uuid}/a/${state}`, body);
+    this.logger.debug(`setDeviceStatus response: ${JSON.stringify(response.data)}`);
   }
 
   private async getAwsAccessToken(jwt: string): Promise<{accessToken: string}> {
     this.logger.debug('Getting AWS access token...');
 
-    const response = await this.apiCall('/login', undefined, {
+    const response = await this.apiCall('/login', undefined, 'POST', {
       'Authorization': `Bearer ${jwt}`,
       'idtoken': jwt,
     });
@@ -209,20 +220,26 @@ export default class BlueAirAwsApi {
   private async apiCall<T = any>(
     url: string,
     data?: string | object,
+    method = 'POST',
     headers?: object,
     retries = 3,
   ): Promise<AxiosResponse<T>> {
     try {
-      const response = await this.blueairAxios.post<T>(url, data, { headers });
+      const response = await this.blueairAxios.request<T>({
+        url,
+        method,
+        data,
+        headers,
+      });
       if (response.status !== 200) {
         throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(response.data)}`);
       }
       return response;
     } catch (error) {
       if (retries > 0) {
-        return this.apiCall(url, data, headers, retries - 1);
+        return this.apiCall(url, data, method, headers, retries - 1);
       } else {
-        throw new Error(`API call failed after ${retries} retries`);
+        throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
       }
     }
   }
