@@ -23,49 +23,57 @@ export class AirPurifierAccessory {
 
     this.service.setCharacteristic(this.platform.Characteristic.Name, this.configDev.name);
     this.service.getCharacteristic(this.platform.Characteristic.Active)
-      .on('set', this.setActive.bind(this))
-      .on('get', this.getActive.bind(this));
+      .onGet(this.getActive.bind(this))
+      .onSet(this.setActive.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentAirPurifierState)
-      .on('get', this.getCurrentAirPurifierState.bind(this));
+      .onGet(this.getCurrentAirPurifierState.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.TargetAirPurifierState)
-      .on('set', this.setTargetAirPurifierState.bind(this))
-      .on('get', this.getTargetAirPurifierState.bind(this));
+      .onGet(this.getTargetAirPurifierState.bind(this))
+      .onSet(this.setTargetAirPurifierState.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.LockPhysicalControls)
-      .on('set', this.setLockPhysicalControls.bind(this))
-      .on('get', this.getLockPhysicalControls.bind(this));
+      .onGet(this.getLockPhysicalControls.bind(this))
+      .onSet(this.setLockPhysicalControls.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.RotationSpeed)
-      .on('set', this.setRotationSpeed.bind(this))
-      .on('get', this.getRotationSpeed.bind(this));
+      .onGet(this.getRotationSpeed.bind(this))
+      .onSet(this.setRotationSpeed.bind(this));
 
-    this.service.getCharacteristic(this.platform.Characteristic.FilterChangeIndication)
-      .on('get', this.getFilterChangeIndication.bind(this));
+    // this.service.getCharacteristic(this.platform.Characteristic.FilterChangeIndication)
+    //   .onGet(this.getFilterChangeIndication.bind(this));
 
-    this.service.getCharacteristic(this.platform.Characteristic.FilterLifeLevel)
-      .on('get', this.getFilterLifeLevel.bind(this));
+    // this.service.getCharacteristic(this.platform.Characteristic.FilterLifeLevel)
+    //   .onGet(this.getFilterLifeLevel.bind(this));
 
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
-      .on('get', this.getCurrentTemperature.bind(this));
+    // this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+    //   .onGet(this.getCurrentTemperature.bind(this));
 
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
-      .on('get', this.getCurrentRelativeHumidity.bind(this));
+    // this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+    //   .onGet(this.getCurrentRelativeHumidity.bind(this));
+
   }
 
   getActive(): CharacteristicValue {
-    return this.device.state.standby ? this.platform.Characteristic.Active.INACTIVE : this.platform.Characteristic.Active.ACTIVE;
+    return this.device.state.standby ?
+      this.platform.Characteristic.Active.INACTIVE :
+      this.platform.Characteristic.Active.ACTIVE;
   }
 
   setActive(value: CharacteristicValue) {
-    this.device.setState('standby', value === this.platform.Characteristic.Active.ACTIVE);
+    this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {
-    return this.device.state.standby ?
-      this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR :
-      this.platform.Characteristic.CurrentAirPurifierState.IDLE;
+
+    if (this.device.state.standby) {
+      return this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
+    }
+
+    return this.device.state.fanspeed === 0 ?
+      this.platform.Characteristic.CurrentAirPurifierState.IDLE :
+      this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
   }
 
   getTargetAirPurifierState(): CharacteristicValue {
@@ -89,7 +97,9 @@ export class AirPurifierAccessory {
   }
 
   getRotationSpeed(): CharacteristicValue {
-    return this.device.state.fanspeed || 0;
+    return this.device.state.standby === false ?
+      this.device.state.fanspeed || 0:
+      0;
   }
 
   setRotationSpeed(value: CharacteristicValue) {
