@@ -71,7 +71,7 @@ export class AirPurifierAccessory {
       return this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
     }
 
-    return this.device.state.fanspeed === 0 ?
+    return this.device.state.automode && this.device.state.fanspeed === 0 ?
       this.platform.Characteristic.CurrentAirPurifierState.IDLE :
       this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
   }
