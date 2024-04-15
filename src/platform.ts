@@ -18,6 +18,8 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
   private readonly platformConfig: Config;
   private readonly blueAirApi: BlueAirAwsApi;
 
+  private existingUuids: string[] = [];
+
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
@@ -36,9 +38,9 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.api.on('didFinishLaunching', async () => {
       await this.getInitialDeviceStates();
 
-      // setInterval(async () => {
-      //   await this.getInitialDeviceStates();
-      // }, this.platformConfig.pollingInterval * 1000);
+      setInterval(async () => {
+        await this.getValidDevicesStatus();
+      }, this.platformConfig.pollingInterval * 1000);
     });
 
   }
@@ -50,8 +52,21 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.accessories.push(accessory);
   }
 
+  async getValidDevicesStatus() {
+    this.log.debug('Updating devices states...');
+    try {
+      const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, this.existingUuids);
+      for (const device of devices) {
+        this.emit('update', device);
+      }
+      this.log.debug('Devices states updated!');
+    } catch (error) {
+      this.log.error('Error getting valid devices status:', error);
+    }
+  }
 
   async getInitialDeviceStates() {
+    this.log.info('Getting initial device states...');
     try {
       await this.blueAirApi.login();
       let uuids = this.platformConfig.devices.map(device => device.id);
@@ -76,6 +91,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     const uuid = this.api.hap.uuid.generate(device.id);
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
     const deviceConfig = this.platformConfig.devices.find(config => config.id === device.id);
+    this.existingUuids.push(device.id);
 
     if (!deviceConfig) {
       this.log.error(`[${device.id}] Device configuration not found!`);
@@ -91,6 +107,10 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       } catch (error) {
         this.log.error(`[${id}] Error setting state: ${state} = ${value}`, error);
       }
+    });
+
+    blueAirDevice.on('update', (deviceStatus: BlueAirDeviceStatus) => {
+      this.log.info(`[${deviceStatus.id}] Device state updated!`);
     });
 
     if (existingAccessory) {

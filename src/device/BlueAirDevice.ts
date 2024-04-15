@@ -15,6 +15,8 @@ export class BlueAirDevice extends EventEmitter {
     this.id = device.id;
     this.state = device.state;
     this.sensorData = device.sensorData;
+
+    this.on('update', this.updateState.bind(this));
   }
 
   public setState(state: string, value: number | boolean | string) {
@@ -27,6 +29,9 @@ export class BlueAirDevice extends EventEmitter {
   }
 
   private updateState(state: BlueAirDeviceStatus) {
+    if (state.id !== this.id) {
+      return;
+    }
     this.state = state.state;
     this.sensorData = state.sensorData;
   }
