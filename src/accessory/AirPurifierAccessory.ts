@@ -2,6 +2,7 @@ import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
 import { DeviceConfig } from '../platformUtils';
+import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
 
 export class AirPurifierAccessory {
 
@@ -53,16 +54,51 @@ export class AirPurifierAccessory {
     // this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
     //   .onGet(this.getCurrentRelativeHumidity.bind(this));
 
+    this.device.on('stateUpdated', (changedStates) => this.updateCharacteristics(changedStates));
+  }
+
+  updateCharacteristics(changedStates: Partial<FullBlueAirDeviceState>) {
+    for (const [k, v] of Object.entries(changedStates)) {
+      this.platform.log.debug(`[${this.device.name}] ${k} changed to ${v}`);
+      switch (k) {
+        case 'standby':
+          this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+          break;
+        case 'automode':
+          this.service.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, this.getTargetAirPurifierState());
+          break;
+        case 'childlock':
+          this.service.updateCharacteristic(this.platform.Characteristic.LockPhysicalControls, this.getLockPhysicalControls());
+          break;
+        case 'fanspeed':
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+          this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
+          break;
+        case 'filterusage':
+          this.service.updateCharacteristic(this.platform.Characteristic.FilterChangeIndication, this.getFilterChangeIndication());
+          this.service.updateCharacteristic(this.platform.Characteristic.FilterLifeLevel, this.getFilterLifeLevel());
+          break;
+        case 'temperature':
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.getCurrentTemperature());
+          break;
+        case 'humidity':
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.getCurrentRelativeHumidity());
+          break;
+      }
+    }
   }
 
   getActive(): CharacteristicValue {
-    return this.device.state.standby ?
-      this.platform.Characteristic.Active.INACTIVE :
-      this.platform.Characteristic.Active.ACTIVE;
+    return this.device.state.standby === false ?
+      this.platform.Characteristic.Active.ACTIVE :
+      this.platform.Characteristic.Active.INACTIVE;
   }
 
-  setActive(value: CharacteristicValue) {
-    this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
+  async setActive(value: CharacteristicValue) {
+    await this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
+    // this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
+    // this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {
@@ -82,8 +118,8 @@ export class AirPurifierAccessory {
       this.platform.Characteristic.TargetAirPurifierState.MANUAL;
   }
 
-  setTargetAirPurifierState(value: CharacteristicValue) {
-    this.device.setState('automode', value === this.platform.Characteristic.TargetAirPurifierState.AUTO);
+  async setTargetAirPurifierState(value: CharacteristicValue) {
+    await this.device.setState('automode', value === this.platform.Characteristic.TargetAirPurifierState.AUTO);
   }
 
   getLockPhysicalControls(): CharacteristicValue {
@@ -92,8 +128,8 @@ export class AirPurifierAccessory {
       this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_DISABLED;
   }
 
-  setLockPhysicalControls(value: CharacteristicValue) {
-    this.device.setState('childlock', value === this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED);
+  async setLockPhysicalControls(value: CharacteristicValue) {
+    await this.device.setState('childlock', value === this.platform.Characteristic.LockPhysicalControls.CONTROL_LOCK_ENABLED);
   }
 
   getRotationSpeed(): CharacteristicValue {
@@ -102,8 +138,8 @@ export class AirPurifierAccessory {
       0;
   }
 
-  setRotationSpeed(value: CharacteristicValue) {
-    this.device.setState('fanspeed', value as number);
+  async setRotationSpeed(value: CharacteristicValue) {
+    await this.device.setState('fanspeed', value as number);
   }
 
   getFilterChangeIndication(): CharacteristicValue {
