@@ -19,27 +19,21 @@
   "scripts": {
     "lint": "eslint src/**/*.ts --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
-    "build": "rimraf ./dist && tsc",
+    "wasm-pack": "wasm-pack build --target nodejs --out-name index",
+    "build": "rimraf pkg dist && npm run wasm-pack && tsc",
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
     "homebridge-plugin"
   ],
   "devDependencies": {
-    "@types/lodash": "^4.17.0",
     "@types/node": "^20.12.5",
-    "@typescript-eslint/eslint-plugin": "^7.5.0",
-    "@typescript-eslint/parser": "^7.5.0",
-    "eslint": "^8.57.0",
     "homebridge": "^1.7.0",
-    "nodemon": "^3.1.0",
     "rimraf": "^5.0.5",
-    "ts-node": "^10.9.2",
     "typescript": "^5.4.4"
   },
   "dependencies": {
     "@homebridge/plugin-ui-utils": "^1.0.3",
-    "axios": "^1.6.8",
-    "lodash": "^4.17.21"
+    "homebridge-blueair-platform": "file:./pkg"
   }
 }

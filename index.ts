@@ -1,11 +1,11 @@
 import { API } from 'homebridge';
 
 import { PLATFORM_NAME } from './settings';
-import { BlueAirPlatform } from './platform';
+import * as wasm from "homebridge-blueair-platform";
 
 /**
  * This method registers the platform with Homebridge
  */
 export = (api: API) => {
-  api.registerPlatform(PLATFORM_NAME, BlueAirPlatform);
+  api.registerPlatform(PLATFORM_NAME, wasm.Platform);
 };
