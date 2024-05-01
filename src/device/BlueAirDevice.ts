@@ -60,7 +60,7 @@ export class BlueAirDevice extends EventEmitter {
     return new Promise<void>((resolve) => {
       this.once('setStateDone', () => {
         release();
-        this.notifyStateUpdate({[attribute]: value});
+        // this.notifyStateUpdate({[attribute]: value});
         resolve();
       });
     });

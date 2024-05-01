@@ -8,17 +8,17 @@
     "properties": {
       "username": {
         "title": "Username",
-        "description": "Username for BlueAir account. This should be filled in autometically in the discovery process.",
+        "description": "Username for BlueAir account. This should be filled in automatically in the discovery process.",
         "type": "string"
       },
       "password": {
         "title": "Password",
-        "description": "Password for BlueAir account. This should be filled in autometically in the discovery process.",
+        "description": "Password for BlueAir account. This should be filled in automatically in the discovery process.",
         "type": "string"
       },
       "region": {
         "title": "Region",
-        "description": "Region for BlueAir account. This should be filled in autometically in the discovery process.",
+        "description": "Region for BlueAir account. This should be filled in automatically in the discovery process.",
         "type": "string",
         "enum": ["Default (all other regions)", "Australia", "China", "Russia", "USA"],
         "default": "Default (all other regions)",
@@ -26,7 +26,7 @@
       },
       "accountUuid": {
         "title": "Account UUID",
-        "description": "Account UUID for BlueAir account. This should be filled in autometically in the discovery process.",
+        "description": "Account UUID for BlueAir account. This should be filled in automatically in the discovery process.",
         "type": "string"
       },
       "verboseLogging": {

@@ -97,8 +97,8 @@ export class AirPurifierAccessory {
 
   async setActive(value: CharacteristicValue) {
     await this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
-    // this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
-    // this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+    this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {
