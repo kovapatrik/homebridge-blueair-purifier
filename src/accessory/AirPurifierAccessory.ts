@@ -54,7 +54,7 @@ export class AirPurifierAccessory {
     // this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
     //   .onGet(this.getCurrentRelativeHumidity.bind(this));
 
-    this.device.on('stateUpdated', (changedStates) => this.updateCharacteristics(changedStates));
+    this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
   }
 
   updateCharacteristics(changedStates: Partial<FullBlueAirDeviceState>) {
@@ -90,6 +90,7 @@ export class AirPurifierAccessory {
   }
 
   getActive(): CharacteristicValue {
+    this.platform.log.debug(`[${this.device.name}] Active: ${!this.device.state.standby}`);
     return this.device.state.standby === false ?
       this.platform.Characteristic.Active.ACTIVE :
       this.platform.Characteristic.Active.INACTIVE;
@@ -97,8 +98,6 @@ export class AirPurifierAccessory {
 
   async setActive(value: CharacteristicValue) {
     await this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
-    this.service.updateCharacteristic(this.platform.Characteristic.Active, value as CharacteristicValue);
-    // this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {

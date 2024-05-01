@@ -39,7 +39,7 @@ export class BlueAirDevice extends EventEmitter {
       this.emit('stateUpdated', this.currentChanges);
       this.currentChanges = {};
       release();
-    } catch (e) {
+    } catch {
       return;
     }
   }
@@ -53,14 +53,16 @@ export class BlueAirDevice extends EventEmitter {
       return;
     }
 
-    const release = await this.semaphore.acquire();
-
     this.emit('setState', {id: this.id, name: this.name, attribute, value});
 
+    const release = await this.semaphore.acquire();
+
     return new Promise<void>((resolve) => {
-      this.once('setStateDone', () => {
+      this.once('setStateDone', (success) => {
         release();
-        // this.notifyStateUpdate({[attribute]: value});
+        if (success) {
+          this.notifyStateUpdate({[attribute]: value});
+        }
         resolve();
       });
     });

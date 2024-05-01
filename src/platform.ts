@@ -116,12 +116,14 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
 
       // Clear polling interval to avoid conflicts
       this.polling && clearInterval(this.polling);
+      let success = false;
       try {
         await this.blueAirApi.setDeviceStatus(id, attribute, value);
+        success = true;
       } catch (error) {
         this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
       } finally {
-        blueAirDevice.emit('setStateDone');
+        blueAirDevice.emit('setStateDone', success);
         // Restart polling interval
         this.polling = setInterval(async () => {
           await this.getValidDevicesStatus();
