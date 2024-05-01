@@ -61,6 +61,7 @@ export class BlueAirDevice extends EventEmitter {
       this.once('setStateDone', (success) => {
         release();
         if (success) {
+          this.state[attribute] = value;
           // this.notifyStateUpdate({[attribute]: value});
         }
         resolve();
