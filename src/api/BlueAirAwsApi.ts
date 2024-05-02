@@ -3,7 +3,7 @@ import { RegionMap } from '../platformUtils';
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import GigyaApi from './GigyaApi';
 import { BLUEAIR_API_TIMEOUT, BLUEAIR_CONFIG, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION } from './Consts';
-// import Semaphore from 'semaphore-promise';
+import Semaphore from 'semaphore-promise';
 
 type BlueAirDeviceDiscovery = {
   mac: string;
@@ -77,7 +77,7 @@ export default class BlueAirAwsApi {
 
   private last_login: number;
 
-  // private semaphore: Semaphore;
+  private semaphore: Semaphore;
 
   constructor(
     username: string,
@@ -87,7 +87,7 @@ export default class BlueAirAwsApi {
   ) {
     const config = BLUEAIR_CONFIG[RegionMap[region]].awsConfig;
 
-    // this.semaphore = new Semaphore(1);
+    this.semaphore = new Semaphore(1);
 
     this.logger.debug(`Creating BlueAir API instance with config: ${JSON.stringify(config)} and username: ${username}\
     and region: ${region}`);
@@ -231,7 +231,7 @@ export default class BlueAirAwsApi {
     headers?: object,
     retries = 3,
   ): Promise<AxiosResponse<T>> {
-    // const release = await this.semaphore.acquire();
+    const release = await this.semaphore.acquire();
     try {
       const response = await this.blueairAxios.request<T>({
         url,
@@ -249,9 +249,8 @@ export default class BlueAirAwsApi {
       } else {
         throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
       }
+    } finally {
+      release();
     }
-    // finally {
-    //   release();
-    // }
   }
 }
