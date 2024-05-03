@@ -1,6 +1,5 @@
 import { Logger } from 'homebridge';
 import { RegionMap } from '../platformUtils';
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import GigyaApi from './GigyaApi';
 import { BLUEAIR_API_TIMEOUT, BLUEAIR_CONFIG, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION } from './Consts';
 import Semaphore from 'semaphore-promise';
@@ -73,11 +72,13 @@ export const BlueAirDeviceSensorDataMap = {
 export default class BlueAirAwsApi {
 
   private readonly gigyaApi: GigyaApi;
-  private readonly blueairAxios: AxiosInstance;
 
   private last_login: number;
 
   private semaphore: Semaphore;
+
+  private accessToken: string;
+  private blueAirApiUrl: string;
 
   constructor(
     username: string,
@@ -86,6 +87,7 @@ export default class BlueAirAwsApi {
     private readonly logger: Logger,
   ) {
     const config = BLUEAIR_CONFIG[RegionMap[region]].awsConfig;
+    this.blueAirApiUrl = `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`;
 
     this.semaphore = new Semaphore(1);
 
@@ -93,17 +95,9 @@ export default class BlueAirAwsApi {
     and region: ${region}`);
 
     this.gigyaApi = new GigyaApi(username, password, region, logger);
-    this.blueairAxios = axios.create({
-      baseURL: `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`,
-      headers: {
-        'Accept': '*/*',
-        'Connection': 'keep-alive',
-        'Accept-Encoding': 'gzip, deflate, br',
-      },
-      timeout: BLUEAIR_API_TIMEOUT,
-    });
 
     this.last_login = 0;
+    this.accessToken = '';
   }
 
   async login(): Promise<void> {
@@ -115,8 +109,7 @@ export default class BlueAirAwsApi {
     const { accessToken } = await this.getAwsAccessToken(jwt);
 
     this.last_login = Date.now();
-    this.blueairAxios.defaults.headers['Authorization'] = `Bearer ${accessToken}`;
-    this.blueairAxios.defaults.headers['idtoken'] = accessToken;
+    this.accessToken = accessToken;
 
     this.logger.debug('Logged in');
   }
@@ -136,11 +129,11 @@ export default class BlueAirAwsApi {
 
     const response = await this.apiCall('/registered-devices', undefined, 'GET');
 
-    if (!response.data.devices) {
+    if (!response.devices) {
       throw new Error('getDevices error: no devices in response');
     }
 
-    const devices = response.data.devices as BlueAirDeviceDiscovery[];
+    const devices = response.devices as BlueAirDeviceDiscovery[];
     return devices;
   }
 
@@ -150,9 +143,8 @@ export default class BlueAirAwsApi {
     const body = {
       deviceconfigquery: uuids.map((uuid) => ({ id: uuid} )),
     };
-    const response = await this.apiCall<BlueAirDeviceStatusResponse>(`/${accountUuid}/r/initial`, body);
+    const data = await this.apiCall<BlueAirDeviceStatusResponse>(`/${accountUuid}/r/initial`, body);
 
-    const { data } = response;
     if (!data.deviceInfo) {
       throw new Error('getDeviceStatus error: no deviceInfo in response');
     }
@@ -187,7 +179,7 @@ export default class BlueAirAwsApi {
   async setDeviceStatus(uuid: string, state: keyof BlueAirDeviceState, value: number | boolean): Promise<void> {
     await this.checkTokenExpiration();
 
-    this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);
+    // this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);
 
     const body : BlueAirSetStateBody = {
       n: state,
@@ -201,8 +193,9 @@ export default class BlueAirAwsApi {
       throw new Error(`setDeviceStatus: unknown value type ${typeof value}`);
     }
 
-    const response = await this.apiCall(`/${uuid}/a/${state}`, body);
-    this.logger.debug(`setDeviceStatus response: ${JSON.stringify(response.data)}`);
+    // const response = await this.apiCall(`/${uuid}/a/${state}`, body);
+    await this.apiCall(`/${uuid}/a/${state}`, body);
+    // this.logger.debug(`setDeviceStatus response: ${JSON.stringify(response)}`);
   }
 
   private async getAwsAccessToken(jwt: string): Promise<{accessToken: string}> {
@@ -213,13 +206,13 @@ export default class BlueAirAwsApi {
       'idtoken': jwt,
     });
 
-    if (!response.data.access_token) {
-      throw new Error(`AWS access token error: ${JSON.stringify(response.data)}`);
+    if (!response.access_token) {
+      throw new Error(`AWS access token error: ${JSON.stringify(response)}`);
     }
 
     this.logger.debug('AWS access token received');
     return {
-      accessToken: response.data.access_token,
+      accessToken: response.access_token,
     };
   }
 
@@ -230,19 +223,29 @@ export default class BlueAirAwsApi {
     method = 'POST',
     headers?: object,
     retries = 3,
-  ): Promise<AxiosResponse<T>> {
+  ): Promise<T> {
     const release = await this.semaphore.acquire();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
     try {
-      const response = await this.blueairAxios.request<T>({
-        url,
-        method,
-        data,
-        headers,
+      const response = await fetch(`${this.blueAirApiUrl}${url}`, {
+        method: method,
+        headers: {
+          'Accept': '*/*',
+          'Connection': 'keep-alive',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Authorization': `Bearer ${this.accessToken}`,
+          'idtoken': this.accessToken,
+          ...headers,
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
       });
+      const json = await response.json();
       if (response.status !== 200) {
-        throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(response.data)}`);
+        throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
       }
-      return response;
+      return json as T;
     } catch (error) {
       if (retries > 0) {
         return this.apiCall(url, data, method, headers, retries - 1);
@@ -250,6 +253,7 @@ export default class BlueAirAwsApi {
         throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
       }
     } finally {
+      clearTimeout(timeout);
       release();
     }
   }

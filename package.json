@@ -39,7 +39,6 @@
   },
   "dependencies": {
     "@homebridge/plugin-ui-utils": "^1.0.3",
-    "axios": "^1.6.8",
     "lodash": "^4.17.21",
     "semaphore-promise": "^1.4.2"
   }

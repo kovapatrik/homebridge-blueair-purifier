@@ -44,7 +44,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       // this.polling = setInterval(() => {
       //   this.getValidDevicesStatus();
       // }, this.platformConfig.pollingInterval);
-      this.getValidDevicesStatus();
+      // this.getValidDevicesStatus();
     });
 
   }
@@ -114,7 +114,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.devices.push(blueAirDevice);
 
     blueAirDevice.on('setState', async ({id, name, attribute, value}) => {
-      this.log.info(`[${name}] Setting state: ${attribute} = ${value}`);
+      // this.log.info(`[${name}] Setting state: ${attribute} = ${value}`);
 
       // Clear polling interval to avoid conflicts
       this.polling && clearInterval(this.polling);
