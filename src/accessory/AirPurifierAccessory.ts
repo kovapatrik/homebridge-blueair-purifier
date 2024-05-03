@@ -101,8 +101,6 @@ export class AirPurifierAccessory {
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {
-
-    this.platform.log.debug(`[${this.device.name}] CurrentAirPurifierState: ${this.device.state.standby}`);
     if (this.device.state.standby === false) {
       return this.device.state.automode && this.device.state.fanspeed === 0 ?
         this.platform.Characteristic.CurrentAirPurifierState.IDLE :
