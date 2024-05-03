@@ -16,8 +16,7 @@ export class AirPurifierAccessory {
   ) {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'BlueAir')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.configDev.id);
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'BlueAir');
 
     this.service = this.accessory.getService(this.platform.Service.AirPurifier) ||
                    this.accessory.addService(this.platform.Service.AirPurifier);
@@ -72,8 +71,9 @@ export class AirPurifierAccessory {
           this.service.updateCharacteristic(this.platform.Characteristic.LockPhysicalControls, this.getLockPhysicalControls());
           break;
         case 'fanspeed':
-          this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
           this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
+          this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
           break;
         case 'filterusage':
           this.service.updateCharacteristic(this.platform.Characteristic.FilterChangeIndication, this.getFilterChangeIndication());
@@ -102,13 +102,15 @@ export class AirPurifierAccessory {
 
   getCurrentAirPurifierState(): CharacteristicValue {
 
-    if (this.device.state.standby) {
-      return this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
+    this.platform.log.debug(`[${this.device.name}] CurrentAirPurifierState: ${this.device.state.standby}`);
+    if (this.device.state.standby === false) {
+      return this.device.state.automode && this.device.state.fanspeed === 0 ?
+        this.platform.Characteristic.CurrentAirPurifierState.IDLE :
+        this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
     }
 
-    return this.device.state.automode && this.device.state.fanspeed === 0 ?
-      this.platform.Characteristic.CurrentAirPurifierState.IDLE :
-      this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
+    return this.platform.Characteristic.CurrentAirPurifierState.INACTIVE;
+
   }
 
   getTargetAirPurifierState(): CharacteristicValue {
