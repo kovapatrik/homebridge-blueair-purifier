@@ -43,7 +43,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.api.on('didFinishLaunching', async () => {
       await this.getInitialDeviceStates();
 
-      this.polling = setInterval(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
+      this.getValidDevicesStatus();
     });
   }
 
@@ -69,6 +69,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     } catch (error) {
       this.log.error('Error getting valid devices status:', error);
     }
+    this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
   }
 
   async getInitialDeviceStates() {
@@ -112,7 +113,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       // this.log.info(`[${name}] Setting state: ${attribute} = ${value}`);
 
       // Clear polling to avoid conflicts
-      this.polling && clearInterval(this.polling);
+      this.polling && clearTimeout(this.polling);
       let success = false;
       try {
         await this.blueAirApi.setDeviceStatus(id, attribute, value);
@@ -121,8 +122,9 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
         this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
       } finally {
         blueAirDevice.emit('setStateDone', success);
-        // Restart polling
-        this.polling = setInterval(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
+        // Have to clear polling again to avoid conflicts
+        this.polling && clearTimeout(this.polling);
+        this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
       }
     });
 

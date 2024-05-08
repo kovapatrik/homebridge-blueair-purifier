@@ -2,7 +2,7 @@ import { Logger } from 'homebridge';
 import { RegionMap } from '../platformUtils';
 import GigyaApi from './GigyaApi';
 import { BLUEAIR_API_TIMEOUT, BLUEAIR_CONFIG, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION } from './Consts';
-import Semaphore from 'semaphore-promise';
+import { Mutex } from 'async-mutex';
 
 type BlueAirDeviceDiscovery = {
   mac: string;
@@ -74,7 +74,7 @@ export default class BlueAirAwsApi {
 
   private last_login: number;
 
-  private semaphore: Semaphore;
+  private mutex: Mutex;
 
   private accessToken: string;
   private blueAirApiUrl: string;
@@ -88,7 +88,7 @@ export default class BlueAirAwsApi {
     const config = BLUEAIR_CONFIG[RegionMap[region]].awsConfig;
     this.blueAirApiUrl = `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`;
 
-    this.semaphore = new Semaphore(1);
+    this.mutex = new Mutex();
 
     this.logger.debug(`Creating BlueAir API instance with config: ${JSON.stringify(config)} and username: ${username}\
     and region: ${region}`);
@@ -216,7 +216,7 @@ export default class BlueAirAwsApi {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async apiCall<T = any>(url: string, data?: string | object, method = 'POST', headers?: object, retries = 3): Promise<T> {
-    const release = await this.semaphore.acquire();
+    const release = await this.mutex.acquire();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
     try {

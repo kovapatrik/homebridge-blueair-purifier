@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus, FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
-import Semaphore from 'semaphore-promise';
+import { Mutex } from 'async-mutex';
 
 type AQILevels = {
   AQI_LO: number[];
@@ -40,7 +40,7 @@ export class BlueAirDevice extends EventEmitter {
   public readonly id: string;
   public readonly name: string;
 
-  private semaphore: Semaphore;
+  private mutex: Mutex;
 
   private currentChanges: Partial<FullBlueAirDeviceState>;
 
@@ -58,7 +58,7 @@ export class BlueAirDevice extends EventEmitter {
     };
     this.sensorData.aqi = this.calculateAqi();
 
-    this.semaphore = new Semaphore(1);
+    this.mutex = new Mutex();
     this.currentChanges = {};
 
     this.last_brightness = this.state.brightness || 0;
@@ -66,18 +66,17 @@ export class BlueAirDevice extends EventEmitter {
     this.on('update', this.updateState.bind(this));
   }
 
-  private notifyStateUpdate(newState?: Partial<BlueAirDeviceState>, newSensorData?: Partial<BlueAirDeviceSensorData>) {
+  private async notifyStateUpdate(newState?: Partial<BlueAirDeviceState>, newSensorData?: Partial<BlueAirDeviceSensorData>) {
     this.currentChanges = { ...this.currentChanges, ...newState, ...newSensorData };
-    try {
-      const release = this.semaphore.tryAcquire();
-      this.state = { ...this.state, ...newState };
-      this.sensorData = { ...this.sensorData, ...newSensorData };
-      this.emit('stateUpdated', this.currentChanges);
-      this.currentChanges = {};
-      release();
-    } catch {
+    if (this.mutex.isLocked()) {
       return;
     }
+    const release = await this.mutex.acquire();
+    this.state = { ...this.state, ...newState };
+    this.sensorData = { ...this.sensorData, ...newSensorData };
+    this.emit('stateUpdated', this.currentChanges);
+    this.currentChanges = {};
+    release();
   }
 
   public async setState(attribute: string, value: number | boolean | string) {
@@ -91,14 +90,18 @@ export class BlueAirDevice extends EventEmitter {
 
     this.emit('setState', { id: this.id, name: this.name, attribute, value });
 
-    const release = await this.semaphore.acquire();
+    const release = await this.mutex.acquire();
 
     return new Promise<void>((resolve) => {
-      this.once('setStateDone', (success) => {
+      this.once('setStateDone', async (success) => {
         release();
         if (success) {
-          // this.state[attribute] = value;
-          this.notifyStateUpdate({ [attribute]: value });
+          const newState: Partial<BlueAirDeviceState> = { [attribute]: value };
+          if (attribute === 'nightmode' && value === true) {
+            newState['fanspeed'] = 11;
+            newState['brightness'] = 0;
+          }
+          await this.notifyStateUpdate(newState);
         }
         resolve();
       });
@@ -113,7 +116,7 @@ export class BlueAirDevice extends EventEmitter {
     await this.setState('brightness', brightness);
   }
 
-  private updateState(newState: BlueAirDeviceStatus) {
+  private async updateState(newState: BlueAirDeviceStatus) {
     const changedState: Partial<BlueAirDeviceState> = {};
     const changedSensorData: Partial<BlueAirSensorDataWithAqi> = {};
 
@@ -130,7 +133,7 @@ export class BlueAirDevice extends EventEmitter {
         }
       }
     }
-    this.notifyStateUpdate(changedState, changedSensorData);
+    await this.notifyStateUpdate(changedState, changedSensorData);
   }
 
   private calculateAqi(): number | undefined {
