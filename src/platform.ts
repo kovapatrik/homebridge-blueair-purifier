@@ -18,6 +18,11 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
   private readonly platformConfig: Config;
   private readonly blueAirApi: BlueAirAwsApi;
 
+  private existingUuids: string[] = [];
+
+  private devices: BlueAirDevice[] = [];
+  private polling: NodeJS.Timeout | null = null;
+
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
@@ -27,8 +32,10 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.platformConfig = defaultsDeep(config, defaultConfig);
 
     if (!this.platformConfig.username || !this.platformConfig.password || !this.platformConfig.accountUuid) {
-      this.log.error(`Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
-      config.json file`);
+      this.log.error(
+        'Missing required configuration options! Please do the device discovery in the configuration UI and/or check your\
+      config.json file',
+      );
     }
 
     this.blueAirApi = new BlueAirAwsApi(this.platformConfig.username, this.platformConfig.password, this.platformConfig.region, log);
@@ -36,34 +43,49 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.api.on('didFinishLaunching', async () => {
       await this.getInitialDeviceStates();
 
-      // setInterval(async () => {
-      //   await this.getInitialDeviceStates();
-      // }, this.platformConfig.pollingInterval * 1000);
+      this.polling = setInterval(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
     });
-
   }
 
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
-
-    // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
   }
 
+  async getValidDevicesStatus() {
+    this.log.debug('Updating devices states...');
+    try {
+      const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, this.existingUuids);
+      for (const device of devices) {
+        const blueAirDevice = this.devices.find((d) => d.id === device.id);
+        if (!blueAirDevice) {
+          this.log.error(`[${device.name}] Device not found in cache!`);
+          continue;
+        }
+        this.log.debug(`[${device.name}] Updating device state...`);
+        blueAirDevice.emit('update', device);
+      }
+      this.log.debug('Devices states updated!');
+    } catch (error) {
+      this.log.error('Error getting valid devices status:', error);
+    }
+  }
 
   async getInitialDeviceStates() {
+    this.log.info('Getting initial device states...');
     try {
       await this.blueAirApi.login();
-      let uuids = this.platformConfig.devices.map(device => device.id);
+      let uuids = this.platformConfig.devices.map((device) => device.id);
       const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, uuids);
 
       for (const device of devices) {
         this.addDevice(device);
-        uuids = uuids.filter(uuid => uuid !== device.id);
+        uuids = uuids.filter((uuid) => uuid !== device.id);
       }
 
       for (const uuid of uuids) {
-        this.log.warn(`[${uuid}] Device not found in AWS API response!`);
+        const device = this.platformConfig.devices.find((device) => device.id === uuid)!;
+        this.log.warn(`[${device.name}] Device not found in AWS API response!`);
       }
 
       this.log.info('All configured devices have been added!');
@@ -72,24 +94,35 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     }
   }
 
-  addDevice(device: BlueAirDeviceStatus) {
+  async addDevice(device: BlueAirDeviceStatus) {
     const uuid = this.api.hap.uuid.generate(device.id);
-    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-    const deviceConfig = this.platformConfig.devices.find(config => config.id === device.id);
+    const existingAccessory = this.accessories.find((accessory) => accessory.UUID === uuid);
+    const deviceConfig = this.platformConfig.devices.find((config) => config.id === device.id);
+    this.existingUuids.push(device.id);
 
     if (!deviceConfig) {
-      this.log.error(`[${device.id}] Device configuration not found!`);
+      this.log.error(`[${device.name}] Device configuration not found!`);
       return;
     }
 
     const blueAirDevice = new BlueAirDevice(device);
+    this.devices.push(blueAirDevice);
 
-    blueAirDevice.on('setState', async ({id, state, value}) => {
-      this.log.info(`[${id}] Setting state: ${state} = ${value}`);
+    blueAirDevice.on('setState', async ({ id, name, attribute, value }) => {
+      // this.log.info(`[${name}] Setting state: ${attribute} = ${value}`);
+
+      // Clear polling to avoid conflicts
+      this.polling && clearInterval(this.polling);
+      let success = false;
       try {
-        await this.blueAirApi.setDeviceStatus(id, state, value);
+        await this.blueAirApi.setDeviceStatus(id, attribute, value);
+        success = true;
       } catch (error) {
-        this.log.error(`[${id}] Error setting state: ${state} = ${value}`, error);
+        this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
+      } finally {
+        blueAirDevice.emit('setStateDone', success);
+        // Restart polling
+        this.polling = setInterval(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
       }
     });
 
