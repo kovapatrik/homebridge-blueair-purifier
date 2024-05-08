@@ -40,7 +40,7 @@ export type BlueAirDeviceSensorData = {
   humidity?: number;
   pm1?: number;
   pm10?: number;
-  pm25?: number;
+  pm2_5?: number;
   temperature?: number;
   voc?: number;
 };
@@ -64,13 +64,12 @@ export const BlueAirDeviceSensorDataMap = {
   h: 'humidity',
   pm1: 'pm1',
   pm10: 'pm10',
-  pm2_5: 'pm25',
+  pm2_5: 'pm2_5',
   t: 'temperature',
   tVOC: 'voc',
 };
 
 export default class BlueAirAwsApi {
-
   private readonly gigyaApi: GigyaApi;
 
   private last_login: number;
@@ -101,7 +100,6 @@ export default class BlueAirAwsApi {
   }
 
   async login(): Promise<void> {
-
     this.logger.debug('Logging in...');
 
     const { token, secret } = await this.gigyaApi.getGigyaSession();
@@ -141,7 +139,7 @@ export default class BlueAirAwsApi {
     await this.checkTokenExpiration();
 
     const body = {
-      deviceconfigquery: uuids.map((uuid) => ({ id: uuid} )),
+      deviceconfigquery: uuids.map((uuid) => ({ id: uuid })),
     };
     const data = await this.apiCall<BlueAirDeviceStatusResponse>(`/${accountUuid}/r/initial`, body);
 
@@ -149,7 +147,7 @@ export default class BlueAirAwsApi {
       throw new Error('getDeviceStatus error: no deviceInfo in response');
     }
 
-    const deviceStatuses: BlueAirDeviceStatus[] = data.deviceInfo.map(device => {
+    const deviceStatuses: BlueAirDeviceStatus[] = data.deviceInfo.map((device) => {
       return {
         id: device.id,
         name: device.configuration.di.name,
@@ -181,7 +179,7 @@ export default class BlueAirAwsApi {
 
     // this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);
 
-    const body : BlueAirSetStateBody = {
+    const body: BlueAirSetStateBody = {
       n: state,
     };
 
@@ -198,12 +196,12 @@ export default class BlueAirAwsApi {
     // this.logger.debug(`setDeviceStatus response: ${JSON.stringify(response)}`);
   }
 
-  private async getAwsAccessToken(jwt: string): Promise<{accessToken: string}> {
+  private async getAwsAccessToken(jwt: string): Promise<{ accessToken: string }> {
     this.logger.debug('Getting AWS access token...');
 
     const response = await this.apiCall('/login', undefined, 'POST', {
-      'Authorization': `Bearer ${jwt}`,
-      'idtoken': jwt,
+      Authorization: `Bearer ${jwt}`,
+      idtoken: jwt,
     });
 
     if (!response.access_token) {
@@ -217,13 +215,7 @@ export default class BlueAirAwsApi {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async apiCall<T = any>(
-    url: string,
-    data?: string | object,
-    method = 'POST',
-    headers?: object,
-    retries = 3,
-  ): Promise<T> {
+  private async apiCall<T = any>(url: string, data?: string | object, method = 'POST', headers?: object, retries = 3): Promise<T> {
     const release = await this.semaphore.acquire();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
@@ -231,11 +223,11 @@ export default class BlueAirAwsApi {
       const response = await fetch(`${this.blueAirApiUrl}${url}`, {
         method: method,
         headers: {
-          'Accept': '*/*',
-          'Connection': 'keep-alive',
+          Accept: '*/*',
+          Connection: 'keep-alive',
           'Accept-Encoding': 'gzip, deflate, br',
-          'Authorization': `Bearer ${this.accessToken}`,
-          'idtoken': this.accessToken,
+          Authorization: `Bearer ${this.accessToken}`,
+          idtoken: this.accessToken,
           ...headers,
         },
         body: JSON.stringify(data),

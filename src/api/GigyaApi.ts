@@ -3,7 +3,6 @@ import { BLUEAIR_CONFIG } from './Consts';
 import { RegionMap } from '../platformUtils';
 
 export default class GigyaApi {
-
   private api_key: string;
   private gigyaApiUrl: string;
 
@@ -42,7 +41,7 @@ export default class GigyaApi {
     };
   }
 
-  public async getGigyaJWT(token: string, secret: string): Promise<{jwt: string}> {
+  public async getGigyaJWT(token: string, secret: string): Promise<{ jwt: string }> {
     const params = new URLSearchParams({
       oauth_token: token,
       secret: secret,
@@ -69,8 +68,8 @@ export default class GigyaApi {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': '*/*',
-          'Connection': 'keep-alive',
+          Accept: '*/*',
+          Connection: 'keep-alive',
           'Accept-Encoding': 'gzip, deflate, br',
         },
         signal: controller.signal,

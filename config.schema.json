@@ -39,21 +39,31 @@
         "description": "Enable to show debug information in the Homebridge UI.",
         "type": "boolean"
       },
+      "pollingInterval": {
+        "title": "Polling Interval",
+        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 5 seconds (5000 miliseconds).",
+        "type": "number"
+      },
       "devices": {
         "title": "Devices",
         "type": "array",
         "items": {
           "type": "object",
           "properties": {
+            "id": {
+              "title": "ID",
+              "type": "string",
+              "required": true
+            },
             "name": {
               "title": "Name",
               "type": "string",
               "required": true
             },
-            "id": {
-              "title": "ID",
-              "type": "string",
-              "required": true
+            "filterChangeLevel": {
+              "title": "Filter Change Level",
+              "description": "Percentage of filter life remaining to trigger a filter change alert.",
+              "type": "number"
             },
             "led": {
               "title": "LED",
@@ -65,19 +75,9 @@
               "description": "Toggles if the air quality sensor service is created with the accessory.",
               "type": "boolean"
             },
-            "co2Sensor": {
-              "title": "CO2 Sensor",
-              "description": "Toggles if the CO2 sensor service is created with the accessory.",
-              "type": "boolean"
-            },
             "temperatureSensor": {
               "title": "Temperature Sensor",
               "description": "Toggles if the temperature sensor service is created with the accessory.",
-              "type": "boolean"
-            },
-            "humiditySensor": {
-              "title": "Humidity Sensor",
-              "description": "Toggles if the humidity sensor service is created with the accessory.",
               "type": "boolean"
             },
             "germShield": {
@@ -110,7 +110,8 @@
             "region",
             "accountUuid",
             "verboseLogging",
-            "uiDebug"
+            "uiDebug",
+            "pollingInterval"
           ]
         },
         {
@@ -118,13 +119,12 @@
           "type": "tabarray",
           "title": "{{ value.name || 'new device' }}",
           "items": [
-            "devices[].name",
             "devices[].id",
+            "devices[].name",
+            "devices[].filterChangeLevel",
             "devices[].led",
             "devices[].airQualitySensor",
-            "devices[].co2Sensor",
             "devices[].temperatureSensor",
-            "devices[].humiditySensor",
             "devices[].germShield",
             "devices[].nightMode"
           ]
