@@ -1,6 +1,6 @@
 <p align="center">
 
-<img src="./branding/Homebridge_x_Blueair.svg" width="150">
+<img src="./branding/Homebridge_x_Blueair.svg" width="500px">
 
 </p>
 
