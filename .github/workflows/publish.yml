@@ -37,10 +37,10 @@ jobs:
           git config --global user.email "kovapatrik@gmail.com"
       - name: Get the version
         id: get_version
-        run: echo "version=$(npm pkg get version | tr -d '\"')" >> $GITHUB_ENV
+        run: echo "version=$(npm pkg get version | tr -d '\"')" >> "$GITHUB_OUTPUT"
       - name: Create tag
         run: |
-          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
+          git tag -a "v${{ steps.get_version.outputs.version }}" -m "Release v${{ steps.get_version.outputs.version }}"
           git push --follow-tags
       - name: Release
         uses: softprops/action-gh-release@v2
