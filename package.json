@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge BlueAir Platform",
   "name": "homebridge-blueair-purifier",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Homebridge plugin for BlueAir purifiers",
   "license": "Apache-2.0",
   "repository": {
