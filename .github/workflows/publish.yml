@@ -25,5 +25,18 @@ jobs:
     needs: publish
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=version::$(npm pkg get version | td -d '\"')
+      - name: Create tag
+        run: |
+          git tag -a v${{ steps.get_version.outputs.version }} -m "Release v${{ steps.get_version.outputs.version }}"
+          git push --follow-tags
       - name: Release
         uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
