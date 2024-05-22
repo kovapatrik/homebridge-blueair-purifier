@@ -24,7 +24,7 @@ sudo npm install -g homebridge-blueair-purifier
 
 ## Supported Devices
 
-This plugin only supports WiFi connected BlueAir purifiers utilizing cloud connectivity (via AWS) for device communication.  Below is a list of known tested products.
+This plugin only supports WiFi connected BlueAir purifiers utilizing cloud connectivity (via AWS) for device communication. Below is a list of known tested products.
 
 | Device | Product Page |
 |----------------|------------|
@@ -38,7 +38,11 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 ### Features
 
 - **Simple Login Mechanism** - all you need is your username and password to get started.
-- **Automatic detection and configuration of multiple BlueAir devices.** By default - all of your supported devices are made available in HomeKit.
+- **Semi-automatic detection and configuration of multiple BlueAir devices.** By default - all of your supported devices are made available in HomeKit.
+
+## Known Issues
+
+- **Air quality readings** - the plugin may not always report the correct air quality readings (like PM 2.5) due to the BlueAir API limitations. The solution for this issue is in progress.
 
 ## Plugin Configuration
 
@@ -57,7 +61,7 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 * Device Auto Discovery
 
 ### Supported Devices / Features
-| Device                                                   | Air Purifier | LED Status Switch | AQI (PM 2.5) | Temp. Sensor | Humidity Sensor | Night Mode | Germ Shield |
+| Device                                                   | Air Purifier | LED Status Switch |    PM 2.5    | Temp. Sensor | Humidity Sensor | Night Mode | Germ Shield |
 |----------------------------------------------------------|:------------:|:-----------------:|:------------:|:------------:|:---------------:|:----------:|:-----------:|
 | DustMagnet                                               |      Y       |         Y         |      Y       |      N       |        N        |     Y      |      N      |
 | HealthProtect                                            |      Y       |         Y         |      Y       |      Y       |        N        |     Y      |      Y      |

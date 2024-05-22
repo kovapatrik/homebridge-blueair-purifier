@@ -139,7 +139,11 @@ export default class BlueAirAwsApi {
     await this.checkTokenExpiration();
 
     const body = {
-      deviceconfigquery: uuids.map((uuid) => ({ id: uuid })),
+      deviceconfigquery: uuids.map((uuid) => ({ id: uuid, r: { r: ['sensors'] } })),
+      includestates: true,
+      eventsubscription: {
+        include: uuids.map((uuid) => ({ filter: { o: `= ${uuid}` } })),
+      },
     };
     const data = await this.apiCall<BlueAirDeviceStatusResponse>(`/${accountUuid}/r/initial`, body);
 
@@ -242,7 +246,11 @@ export default class BlueAirAwsApi {
       if (retries > 0) {
         return this.apiCall(url, data, method, headers, retries - 1);
       } else {
-        throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error(`API call failed after ${3 - retries} retries with timeout.`);
+        } else {
+          throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
+        }
       }
     } finally {
       clearTimeout(timeout);
