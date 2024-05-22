@@ -6,6 +6,11 @@
   "schema": {
     "type": "object",
     "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Name of the BlueAir Purifier platform in Homebridge.",
+        "type": "string"
+      },
       "username": {
         "title": "Username",
         "description": "Username for BlueAir account. This should be filled in automatically in the discovery process.",
@@ -105,6 +110,7 @@
           "expanded": true,
           "title": "Common Settings",
           "items": [
+            "name",
             "username",
             "password",
             "region",

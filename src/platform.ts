@@ -30,6 +30,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
   ) {
     super();
     this.platformConfig = defaultsDeep(config, defaultConfig);
+    this.log.debug('Finished initializing platform:', this.platformConfig.name);
 
     if (!this.platformConfig.username || !this.platformConfig.password || !this.platformConfig.accountUuid) {
       this.log.error(
