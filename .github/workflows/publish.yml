@@ -28,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
+      - name: Setup Git
+        run: |
+          git config --global user.name "Github Actions"
+          git config --global user.email "kovapatrik@gmail.com"
       - name: Get the version
         id: get_version
         run: echo ::set-output name=version::$(npm pkg get version | td -d '\"')
