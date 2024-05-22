@@ -38,7 +38,8 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 ### Features
 
 - **Simple Login Mechanism** - all you need is your username and password to get started.
-- **Semi-automatic detection and configuration of multiple BlueAir devices.** By default - all of your supported devices are made available in HomeKit.
+- **Semi-automatic detection and configuration of multiple BlueAir devices.**
+- **Fast response times** - the plugin uses the BlueAir API to communicate with the devices.
 
 ## Known Issues
 
@@ -47,18 +48,17 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 ## Plugin Configuration
 
 ### Feature Toggles
-* Hide LED
-* Hide Air Quality Sensor
-* Hide Temperature Sensor
-* Hide Germ Shield
-* Hide Night Mode
+* Show LED service as a lightbulb
+* Show Air Quality Sensor service
+* Show Temperature Sensor service
+* Show Germ Shield switch service
+* Show Night Mode switch service
 
 ### Customizable Options
 * Adjustable Filter Change Level
 * Device Name
 * Verbose Logging
 * BlueAir Server Region Selection
-* Device Auto Discovery
 
 ### Supported Devices / Features
 | Device                                                   | Air Purifier | LED Status Switch |    PM 2.5    | Temp. Sensor | Humidity Sensor | Night Mode | Germ Shield |
