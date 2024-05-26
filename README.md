@@ -1,14 +1,12 @@
 <p align="center">
-
-<img src="./branding/Homebridge_x_Blueair.svg" width="500px">
-
+  <a href="https://github.com/homebridge/verified/blob/master/verified-plugins.json"><img alt="Homebridge Verified" src="./branding/Homebridge_x_BlueAir.svg" width="500px"></a>
 </p>
 
-<span align="center">
+# homebridge-blueair-purifier
 
-# Homebridge Blueair Purifier
-
-</span>
+[![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
+[![npm](https://badgen.net/npm/v/homebridge-blueair-purifier)](https://www.npmjs.com/package/homebridge-blueair-purifier)
+[![npm](https://badgen.net/npm/dt/homebridge-blueair-purifier?label=downloads)](https://www.npmjs.com/package/homebridge-blueair-purifier)
 
 ## Installation
 
