@@ -1,13 +1,14 @@
 {
   "displayName": "Homebridge BlueAir Platform",
   "name": "homebridge-blueair-purifier",
-  "version": "0.2.1",
+  "version": "1.0.7",
   "description": "Homebridge plugin for BlueAir purifiers",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kovapatrik/homebridge-blueair-purifier.git"
   },
+  "homepage": "https://github.com/kovapatrik/homebridge-blueair-purifier#readme",
   "bugs": {
     "url": "https://github.com/kovapatrik/homebridge-blueair-purifier/issues"
   },

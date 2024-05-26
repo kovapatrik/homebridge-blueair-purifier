@@ -1,4 +1,5 @@
 export type Config = {
+  name: string;
   username: string;
   password: string;
   region: Region;
@@ -39,6 +40,7 @@ export const RegionMap = {
 };
 
 export const defaultConfig: Config = {
+  name: 'BlueAir Platform',
   uiDebug: false,
   verboseLogging: false,
   username: '',

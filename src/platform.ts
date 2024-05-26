@@ -30,6 +30,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
   ) {
     super();
     this.platformConfig = defaultsDeep(config, defaultConfig);
+    this.log.debug('Finished initializing platform:', this.platformConfig.name);
 
     if (!this.platformConfig.username || !this.platformConfig.password || !this.platformConfig.accountUuid) {
       this.log.error(
@@ -67,9 +68,10 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       }
       this.log.debug('Devices states updated!');
     } catch (error) {
-      this.log.error('Error getting valid devices status:', error);
+      this.log.warn('Error getting valid devices status, reason:', error, '. Retrying in 5 seconds...');
+    } finally {
+      this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
     }
-    this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
   }
 
   async getInitialDeviceStates() {
