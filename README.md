@@ -39,9 +39,8 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 - **Semi-automatic detection and configuration of multiple BlueAir devices.**
 - **Fast response times** - the plugin uses the BlueAir API to communicate with the devices.
 
-## Known Issues
-
-- **Air quality readings** - the plugin may not always report the correct air quality readings (like PM 2.5) due to the BlueAir API limitations. The solution for this issue is in progress.
+>[!NOTE]
+>**Air quality readings** - the plugin may not always report the correct air quality readings (like PM 2.5) due to the BlueAir API limitations. The solution for this issue is in progress.
 
 ## Plugin Configuration
 
