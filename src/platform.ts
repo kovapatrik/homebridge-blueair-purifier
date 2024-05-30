@@ -68,7 +68,9 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       }
       this.log.debug('Devices states updated!');
     } catch (error) {
-      this.log.warn('Error getting valid devices status, reason:', error, '. Retrying in 5 seconds...');
+      const err = error as Error;
+      this.log.warn('Error getting valid devices status, reason:' + err.message + '. Retrying in 5 seconds...');
+      this.log.debug('Error stack:', err.stack);
     } finally {
       this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
     }
