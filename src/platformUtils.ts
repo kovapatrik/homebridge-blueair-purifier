@@ -56,6 +56,8 @@ export const defaultConfig: Config = {
 export const defaultDeviceConfig: DeviceConfig = {
   id: '',
   name: '',
+  model: '',
+  serial_number: '',
   filterChangeLevel: 90,
   led: false,
   airQualitySensor: false,
