@@ -13,6 +13,8 @@ export type Config = {
 export type DeviceConfig = {
   id: string;
   name: string;
+  model: string;
+  serial_number: string;
   filterChangeLevel: number;
   led: boolean;
   airQualitySensor: boolean;
