@@ -65,6 +65,14 @@
               "type": "string",
               "required": true
             },
+            "model": {
+              "title": "Model",
+              "type": "string"
+            },
+            "serialNumber": {
+              "title": "Serial Number",
+              "type": "string"
+            },
             "filterChangeLevel": {
               "title": "Filter Change Level",
               "description": "Percentage of filter life remaining to trigger a filter change alert.",
@@ -127,6 +135,8 @@
           "items": [
             "devices[].id",
             "devices[].name",
+            "devices[].model",
+            "devices[].serialNumber",
             "devices[].filterChangeLevel",
             "devices[].led",
             "devices[].airQualitySensor",
