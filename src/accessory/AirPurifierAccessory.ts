@@ -22,8 +22,8 @@ export class AirPurifierAccessory {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'BlueAir')
-      .setCharacteristic(this.platform.Characteristic.Model, this.configDev.model)
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.configDev.serial_number);
+      .setCharacteristic(this.platform.Characteristic.Model, this.configDev.model || 'BlueAir Purifier')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.configDev.serial_number || 'BlueAir Device');
 
     this.service =
       this.accessory.getService(this.platform.Service.AirPurifier) || this.accessory.addService(this.platform.Service.AirPurifier);
