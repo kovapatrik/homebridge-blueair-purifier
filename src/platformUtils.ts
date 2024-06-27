@@ -13,6 +13,8 @@ export type Config = {
 export type DeviceConfig = {
   id: string;
   name: string;
+  model: string;
+  serialNumber: string;
   filterChangeLevel: number;
   led: boolean;
   airQualitySensor: boolean;
@@ -54,6 +56,8 @@ export const defaultConfig: Config = {
 export const defaultDeviceConfig: DeviceConfig = {
   id: '',
   name: '',
+  model: '',
+  serialNumber: '',
   filterChangeLevel: 90,
   led: false,
   airQualitySensor: false,
