@@ -1,9 +1,9 @@
  <link href="css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous" />
  <script src="js/bootstrap.min.js" crossorigin="anonymous"></script>
- 
+
  <div id="main" data-bs-theme="dark">
    <div class="card">
- 
+
      <div class="card-header" id="uiButtons">
        <h5 class="mb-0 text-center">
          <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#discoverDevices"
@@ -12,7 +12,7 @@
          </button>
        </h5>
      </div>
- 
+
      <div class="collapse" id="discoverDevices">
        <div class="card-body">
          <form>
@@ -32,7 +32,7 @@
                 <option value="Australia">Australia</option>
                 <option value="China">China</option>
                 <option value="Russia">Russia</option>
-                <option value="USA">USA</option>
+                <option value="USA">USA/Canada</option>
               </select>
            </div>
            <button class="btn btn-primary btn-login" type="submit" id="discoverBtn" style="border: 0;">
@@ -59,49 +59,49 @@
        </div>
      </div>
    </div>
- 
+
  </div>
- 
+
  <style>
- 
+
    .hide {
      display: none;
    }
- 
+
    .disabled {
      pointer-events: none;
      opacity: 0.5;
    }
  </style>
- 
- 
+
+
  <script>
- 
+
    (async () => {
      /*********************************************************************
       * Initialize Javascript supporting code
       */
      homebridge.showSpinner();
- 
+
      const { defaultConfig, defaultDeviceConfig } = await homebridge.request('/getDefaults');
      const pluginConfig = await homebridge.getPluginConfig();
      const configSchema = await homebridge.getPluginConfigSchema();
- 
+
      if (!pluginConfig.length) {
        pluginConfig.push({});
      }
      let configuration = pluginConfig[0];
- 
+
      // Helper funcion to contol debug messages
      function debugLog(s) {
        if (configuration.uiDebug) {
          console.debug(s);
        }
      }
- 
+
      debugLog(`Plugin Config:\n${JSON.stringify(configuration, null, 2)}`);
      configuration = await homebridge.request('/mergeToDefault', { config: configuration });
- 
+
      /*********************************************************************
       * showToast event listener
       * Provides information from server-side to the end user.
@@ -114,13 +114,13 @@
          homebridge.toast.error(event.data.msg);
        }
      });
- 
+
      /*********************************************************************
       * filterOutDefaults
       * returns object for config.json that has default values removed
       */
      function filterOutDefaults(object, defaults) {
- 
+
        function deleteEmptyObjects(object) {
          for (const [k, v] of Object.entries(object)) {
            if (!v || typeof v !== 'object' || v === null) {
@@ -133,7 +133,7 @@
          }
          return object;
        }
- 
+
        let newObject = {};
        for (const [k, v] of Object.entries(object)) {
          if (k === 'devices') {
@@ -150,7 +150,7 @@
        }
        return deleteEmptyObjects(newObject);
      }
- 
+
      /*********************************************************************
       * createForm
       * Update the plugin config GUI. Does not save to config.json
@@ -163,22 +163,22 @@
          await homebridge.updatePluginConfig([changes]);
        });
      }
- 
+
      createForm(configSchema, configuration);
      homebridge.hideSpinner();
- 
+
      /*********************************************************************
       * Discover button clicked....
       */
      document.getElementById('discoverBtn').addEventListener('click', async (e) => {
        e.preventDefault();
- 
+
        const username = document.getElementById('username').value;
        const password = document.getElementById('password').value;
        const region = document.getElementById('region').value;
- 
+
        homebridge.showSpinner();
- 
+
        console.info(`Request login...`);
        try {
           const devices = await homebridge.request('/discover', { username, password, region });
@@ -209,7 +209,7 @@
               const td = tr.insertCell();
               td.appendChild(document.createTextNode(state.name));
               td.setAttribute('scope', 'row');
-    
+
               tr.insertCell().appendChild(document.createTextNode(device.uuid));
               tr.insertCell().appendChild(document.createTextNode(device.mac));
 
@@ -227,7 +227,7 @@
                     id: device.uuid,
                     name: state.name
                   };
-    
+
                   configuration.devices.push({
                     ...defaultDeviceConfig,
                     ...newDevice
@@ -235,10 +235,10 @@
                   debugLog(`Adding new device:\n${JSON.stringify({ ...defaultDeviceConfig, ...newDevice }, null, 2)}`);
                   // refresh view
                   createForm(configSchema, configuration);
-    
+
                   addCell.removeChild(button);
                   addCell.appendChild(document.createTextNode('Added'));
-    
+
                   homebridge.toast.success('Device added');
                 });
                 addCell.appendChild(button);
@@ -248,17 +248,17 @@
             table.innerHTML += `<tr><td>No devices found!</td></tr>`;
           }
           document.getElementById('discoverTableWrapper').style.display = 'block';
-    
+
           homebridge.hideSpinner();
 
        } catch (e) {
          homebridge.toast.error(e.message);
          homebridge.hideSpinner();
          return;
-       
+
        }
 
      });
    })();
- 
+
  </script>
