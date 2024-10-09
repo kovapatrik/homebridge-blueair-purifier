@@ -46,7 +46,7 @@
       },
       "pollingInterval": {
         "title": "Polling Interval",
-        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 5 seconds (5000 miliseconds).",
+        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 15 seconds (15000 miliseconds).",
         "type": "number"
       },
       "devices": {
@@ -117,16 +117,7 @@
           "expandable": true,
           "expanded": true,
           "title": "Common Settings",
-          "items": [
-            "name",
-            "username",
-            "password",
-            "region",
-            "accountUuid",
-            "verboseLogging",
-            "uiDebug",
-            "pollingInterval"
-          ]
+          "items": ["name", "username", "password", "region", "accountUuid", "verboseLogging", "uiDebug", "pollingInterval"]
         },
         {
           "key": "devices",
