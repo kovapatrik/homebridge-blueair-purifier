@@ -33,6 +33,11 @@ const AQI: { [key: string]: AQILevels } = {
 
 type BlueAirSensorDataWithAqi = BlueAirDeviceSensorData & { aqi?: number };
 
+type PendingChanges = {
+  state: Partial<BlueAirDeviceState>;
+  sensorData: Partial<BlueAirSensorDataWithAqi>;
+};
+
 export class BlueAirDevice extends EventEmitter {
   public state: BlueAirDeviceState;
   public sensorData: BlueAirSensorDataWithAqi;
@@ -42,7 +47,7 @@ export class BlueAirDevice extends EventEmitter {
 
   private mutex: Mutex;
 
-  private currentChanges: Partial<FullBlueAirDeviceState>;
+  private currentChanges: PendingChanges;
 
   private last_brightness: number;
 
@@ -59,23 +64,46 @@ export class BlueAirDevice extends EventEmitter {
     this.sensorData.aqi = this.calculateAqi();
 
     this.mutex = new Mutex();
-    this.currentChanges = {};
+    this.currentChanges = {
+      state: {},
+      sensorData: {},
+    };
 
     this.last_brightness = this.state.brightness || 0;
 
     this.on('update', this.updateState.bind(this));
   }
 
+  private hasChanges(changes: PendingChanges): boolean {
+    return Object.keys(changes.state).length > 0 || Object.keys(changes.sensorData).length > 0;
+  }
+
   private async notifyStateUpdate(newState?: Partial<BlueAirDeviceState>, newSensorData?: Partial<BlueAirDeviceSensorData>) {
-    this.currentChanges = { ...this.currentChanges, ...newState, ...newSensorData };
+    this.currentChanges = {
+      state: {
+        ...this.currentChanges.state,
+        ...newState,
+      },
+      sensorData: {
+        ...this.currentChanges.sensorData,
+        ...newSensorData,
+      },
+    };
     if (this.mutex.isLocked()) {
       return;
     }
     const release = await this.mutex.acquire();
-    this.state = { ...this.state, ...newState };
-    this.sensorData = { ...this.sensorData, ...newSensorData };
-    this.emit('stateUpdated', this.currentChanges);
-    this.currentChanges = {};
+
+    const changesToApply = this.currentChanges;
+    this.currentChanges = { state: {}, sensorData: {} };
+
+    // if there is a change, emit update event
+    if (this.hasChanges(changesToApply)) {
+      this.state = { ...this.state, ...changesToApply.state };
+      this.sensorData = { ...this.sensorData, ...changesToApply.sensorData };
+      this.emit('stateUpdated', changesToApply);
+    }
+
     release();
   }
 
@@ -158,7 +186,7 @@ export class BlueAirDevice extends EventEmitter {
       if (value >= levels.CONC_LO[i] && value <= levels.CONC_HI[i]) {
         return Math.round(
           ((levels.AQI_HI[i] - levels.AQI_LO[i]) / (levels.CONC_HI[i] - levels.CONC_LO[i])) * (value - levels.CONC_LO[i]) +
-            levels.AQI_LO[i],
+          levels.AQI_LO[i],
         );
       }
     }
