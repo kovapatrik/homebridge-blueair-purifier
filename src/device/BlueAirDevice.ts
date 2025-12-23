@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus, FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus } from '../api/BlueAirAwsApi';
 import { Mutex } from 'async-mutex';
 
 type AQILevels = {
@@ -186,7 +186,7 @@ export class BlueAirDevice extends EventEmitter {
       if (value >= levels.CONC_LO[i] && value <= levels.CONC_HI[i]) {
         return Math.round(
           ((levels.AQI_HI[i] - levels.AQI_LO[i]) / (levels.CONC_HI[i] - levels.CONC_LO[i])) * (value - levels.CONC_LO[i]) +
-          levels.AQI_LO[i],
+            levels.AQI_LO[i],
         );
       }
     }
