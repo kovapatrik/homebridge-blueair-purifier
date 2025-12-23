@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/homebridge/verified/blob/master/verified-plugins.json"><img alt="Homebridge Verified" src="./branding/Homebridge_x_BlueAir.svg" width="500px"></a>
+  <a href="https://github.com/homebridge/verified/blob/master/verified-plugins.json"><img alt="Homebridge Verified" src="./branding/Homebridge_x_Blueair.svg" width="500px"></a>
 </p>
 
 # homebridge-blueair-purifier
