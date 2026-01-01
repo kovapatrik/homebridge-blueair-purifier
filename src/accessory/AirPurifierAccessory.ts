@@ -184,6 +184,8 @@ export class AirPurifierAccessory {
       if (updateState) {
         this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
         this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+        this.service.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, this.getTargetAirPurifierState());
+        this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
         this.ledService?.updateCharacteristic(this.platform.Characteristic.On, this.getLedOn());
         this.germShieldService?.updateCharacteristic(this.platform.Characteristic.On, this.getGermShield());
         this.nightModeService?.updateCharacteristic(this.platform.Characteristic.On, this.getNightMode());

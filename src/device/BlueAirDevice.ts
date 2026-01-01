@@ -89,9 +89,8 @@ export class BlueAirDevice extends EventEmitter {
         ...newSensorData,
       },
     };
-    if (this.mutex.isLocked()) {
-      return;
-    }
+
+    // always acquire the mutex to ensure all changes are eventually applied
     const release = await this.mutex.acquire();
 
     const changesToApply = this.currentChanges;
