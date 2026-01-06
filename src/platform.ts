@@ -9,8 +9,8 @@ import { AirPurifierAccessory } from './accessory/AirPurifierAccessory';
 import EventEmitter from 'events';
 
 export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlugin {
-  public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
+  public readonly Service: typeof Service;
+  public readonly Characteristic: typeof Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -29,6 +29,9 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     public readonly api: API,
   ) {
     super();
+    this.Service = api.hap.Service;
+    this.Characteristic = api.hap.Characteristic;
+
     this.platformConfig = defaultsDeep(config, defaultConfig);
     this.log.debug('Finished initializing platform:', this.platformConfig.name);
 

@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus } from '../api/BlueAirAwsApi';
+import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus, FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
 import { Mutex } from 'async-mutex';
 
 type AQILevels = {
@@ -38,6 +38,21 @@ type PendingChanges = {
   sensorData: Partial<BlueAirSensorDataWithAqi>;
 };
 
+interface BlueAirDeviceEvents {
+  stateUpdated: (changedStates: Partial<FullBlueAirDeviceState>) => void;
+  update: (newState: BlueAirDeviceStatus) => void;
+  setState: (data: { id: string; name: string; attribute: string; value: number | boolean }) => void;
+  setStateDone: (success: boolean) => void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface BlueAirDevice {
+  on<K extends keyof BlueAirDeviceEvents>(event: K, listener: BlueAirDeviceEvents[K]): this;
+  emit<K extends keyof BlueAirDeviceEvents>(event: K, ...args: Parameters<BlueAirDeviceEvents[K]>): boolean;
+  once<K extends keyof BlueAirDeviceEvents>(event: K, listener: BlueAirDeviceEvents[K]): this;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BlueAirDevice extends EventEmitter {
   public state: BlueAirDeviceState;
   public sensorData: BlueAirSensorDataWithAqi;
@@ -100,13 +115,13 @@ export class BlueAirDevice extends EventEmitter {
     if (this.hasChanges(changesToApply)) {
       this.state = { ...this.state, ...changesToApply.state };
       this.sensorData = { ...this.sensorData, ...changesToApply.sensorData };
-      this.emit('stateUpdated', changesToApply);
+      this.emit('stateUpdated', { ...changesToApply.state, ...changesToApply.sensorData });
     }
 
     release();
   }
 
-  public async setState(attribute: string, value: number | boolean | string) {
+  public async setState(attribute: string, value: number | boolean) {
     if (attribute in this.state === false) {
       throw new Error(`Invalid state: ${attribute}`);
     }

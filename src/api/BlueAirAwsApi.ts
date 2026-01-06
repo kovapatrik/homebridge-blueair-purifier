@@ -1,7 +1,7 @@
 import { Logger } from 'homebridge';
-import { RegionMap } from '../platformUtils';
+import { Region } from '../platformUtils';
 import GigyaApi from './GigyaApi';
-import { BLUEAIR_API_TIMEOUT, BLUEAIR_CONFIG, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION } from './Consts';
+import { BLUEAIR_API_TIMEOUT, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION, getAwsConfig } from './Consts';
 import { Mutex } from 'async-mutex';
 
 type BlueAirDeviceDiscovery = {
@@ -32,6 +32,7 @@ export type BlueAirDeviceState = {
   filterusage?: number;
   disinfection?: boolean;
   disinftime?: number;
+  [key: string]: string | number | boolean | undefined;
 };
 
 export type BlueAirDeviceSensorData = {
@@ -43,6 +44,7 @@ export type BlueAirDeviceSensorData = {
   pm2_5?: number;
   temperature?: number;
   voc?: number;
+  [key: string]: string | number | boolean | undefined;
 };
 
 export type BlueAirDeviceStatus = {
@@ -58,7 +60,7 @@ type BlueAirSetStateBody = {
   vb?: boolean;
 };
 
-export const BlueAirDeviceSensorDataMap = {
+export const BlueAirDeviceSensorDataMap: Record<string, keyof BlueAirDeviceSensorData> = {
   fsp0: 'fanspeed',
   hcho: 'hcho',
   h: 'humidity',
@@ -82,10 +84,10 @@ export default class BlueAirAwsApi {
   constructor(
     username: string,
     password: string,
-    region: string,
+    region: Region,
     private readonly logger: Logger,
   ) {
-    const config = BLUEAIR_CONFIG[RegionMap[region]].awsConfig;
+    const config = getAwsConfig(region);
     this.blueAirApiUrl = `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`;
 
     this.mutex = new Mutex();
@@ -178,7 +180,7 @@ export default class BlueAirAwsApi {
     return deviceStatuses;
   }
 
-  async setDeviceStatus(uuid: string, state: keyof BlueAirDeviceState, value: number | boolean): Promise<void> {
+  async setDeviceStatus(uuid: string, state: string, value: number | boolean): Promise<void> {
     await this.checkTokenExpiration();
 
     // this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);

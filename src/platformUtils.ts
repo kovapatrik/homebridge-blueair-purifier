@@ -33,14 +33,6 @@ export enum Region {
   US = 'USA',
 }
 
-export const RegionMap = {
-  [Region.US]: 'us',
-  [Region.CN]: 'cn',
-  [Region.EU]: 'eu',
-  [Region.AU]: 'au',
-  [Region.RU]: 'ru',
-};
-
 export const defaultConfig: Config = {
   name: 'BlueAir Platform',
   uiDebug: false,

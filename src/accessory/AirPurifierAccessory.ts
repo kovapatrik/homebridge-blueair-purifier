@@ -132,7 +132,7 @@ export class AirPurifierAccessory {
 
   updateCharacteristics(changedStates: Partial<FullBlueAirDeviceState>) {
     for (const [k, v] of Object.entries(changedStates)) {
-      this.platform.log.debug(`[${this.device.name}] ${k} changed to ${v}`);
+      this.platform.log.debug(`[${this.device.name}] ${k} changed to ${v}}`);
       let updateState = false;
       let updateAirQuality = false;
       switch (k) {
