@@ -33,6 +33,26 @@ const AQI: { [key: string]: AQILevels } = {
 
 type BlueAirSensorDataWithAqi = BlueAirDeviceSensorData & { aqi?: number };
 
+type PendingChanges = {
+  state: Partial<BlueAirDeviceState>;
+  sensorData: Partial<BlueAirSensorDataWithAqi>;
+};
+
+interface BlueAirDeviceEvents {
+  stateUpdated: (changedStates: Partial<FullBlueAirDeviceState>) => void;
+  update: (newState: BlueAirDeviceStatus) => void;
+  setState: (data: { id: string; name: string; attribute: string; value: number | boolean }) => void;
+  setStateDone: (success: boolean) => void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface BlueAirDevice {
+  on<K extends keyof BlueAirDeviceEvents>(event: K, listener: BlueAirDeviceEvents[K]): this;
+  emit<K extends keyof BlueAirDeviceEvents>(event: K, ...args: Parameters<BlueAirDeviceEvents[K]>): boolean;
+  once<K extends keyof BlueAirDeviceEvents>(event: K, listener: BlueAirDeviceEvents[K]): this;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BlueAirDevice extends EventEmitter {
   public state: BlueAirDeviceState;
   public sensorData: BlueAirSensorDataWithAqi;
@@ -42,7 +62,7 @@ export class BlueAirDevice extends EventEmitter {
 
   private mutex: Mutex;
 
-  private currentChanges: Partial<FullBlueAirDeviceState>;
+  private currentChanges: PendingChanges;
 
   private last_brightness: number;
 
@@ -59,27 +79,49 @@ export class BlueAirDevice extends EventEmitter {
     this.sensorData.aqi = this.calculateAqi();
 
     this.mutex = new Mutex();
-    this.currentChanges = {};
+    this.currentChanges = {
+      state: {},
+      sensorData: {},
+    };
 
     this.last_brightness = this.state.brightness || 0;
 
     this.on('update', this.updateState.bind(this));
   }
 
+  private hasChanges(changes: PendingChanges): boolean {
+    return Object.keys(changes.state).length > 0 || Object.keys(changes.sensorData).length > 0;
+  }
+
   private async notifyStateUpdate(newState?: Partial<BlueAirDeviceState>, newSensorData?: Partial<BlueAirDeviceSensorData>) {
-    this.currentChanges = { ...this.currentChanges, ...newState, ...newSensorData };
-    if (this.mutex.isLocked()) {
-      return;
-    }
+    this.currentChanges = {
+      state: {
+        ...this.currentChanges.state,
+        ...newState,
+      },
+      sensorData: {
+        ...this.currentChanges.sensorData,
+        ...newSensorData,
+      },
+    };
+
+    // always acquire the mutex to ensure all changes are eventually applied
     const release = await this.mutex.acquire();
-    this.state = { ...this.state, ...newState };
-    this.sensorData = { ...this.sensorData, ...newSensorData };
-    this.emit('stateUpdated', this.currentChanges);
-    this.currentChanges = {};
+
+    const changesToApply = this.currentChanges;
+    this.currentChanges = { state: {}, sensorData: {} };
+
+    // if there is a change, emit update event
+    if (this.hasChanges(changesToApply)) {
+      this.state = { ...this.state, ...changesToApply.state };
+      this.sensorData = { ...this.sensorData, ...changesToApply.sensorData };
+      this.emit('stateUpdated', { ...changesToApply.state, ...changesToApply.sensorData });
+    }
+
     release();
   }
 
-  public async setState(attribute: string, value: number | boolean | string) {
+  public async setState(attribute: string, value: number | boolean) {
     if (attribute in this.state === false) {
       throw new Error(`Invalid state: ${attribute}`);
     }

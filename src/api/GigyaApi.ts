@@ -1,6 +1,6 @@
 import { Logger } from 'homebridge';
-import { BLUEAIR_CONFIG } from './Consts';
-import { RegionMap } from '../platformUtils';
+import { getGigyaConfig } from './Consts';
+import { Region } from '../platformUtils';
 
 export default class GigyaApi {
   private api_key: string;
@@ -9,10 +9,10 @@ export default class GigyaApi {
   constructor(
     private readonly username: string,
     private readonly password: string,
-    region: string,
+    region: Region,
     private readonly logger: Logger,
   ) {
-    const config = BLUEAIR_CONFIG[RegionMap[region]].gigyaConfig;
+    const config = getGigyaConfig(region);
 
     this.logger.debug(`Creating Gigya API instance with config: ${JSON.stringify(config)} and username: ${username} and region: ${region}`);
 
