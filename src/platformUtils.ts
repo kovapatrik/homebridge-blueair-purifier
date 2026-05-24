@@ -23,6 +23,7 @@ export type DeviceConfig = {
   humiditySensor: boolean;
   germShield: boolean;
   nightMode: boolean;
+  countdownToCleanAir: boolean;
 };
 
 export enum Region {
@@ -58,4 +59,5 @@ export const defaultDeviceConfig: DeviceConfig = {
   humiditySensor: false,
   germShield: false,
   nightMode: false,
+  countdownToCleanAir: false,
 };
