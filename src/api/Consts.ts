@@ -84,7 +84,7 @@ export type BlueAirDeviceStatusResponse = {
 
 export type BlueAirTelemetryResponse = {
   sensors: string[];
-  datapoints: string[][];
+  datapoints: (string | null)[][];
   start: string;
   end: string;
   did: string;

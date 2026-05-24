@@ -210,21 +210,18 @@ export default class BlueAirAwsApi {
     if (!deviceInfo?.configuration?.ds) {
       return [];
     }
-    const knownSensors = Object.keys(BlueAirDeviceSensorDataMap);
+    const knownSensors = new Set(Object.keys(BlueAirDeviceSensorDataMap));
     const available = new Set<string>();
-    for (const entry of Object.values(deviceInfo.configuration.ds)) {
+    for (const [key, entry] of Object.entries(deviceInfo.configuration.ds)) {
+      if (knownSensors.has(key)) {
+        available.add(key);
+      }
       if (entry.sn) {
         for (const s of entry.sn) {
-          if (knownSensors.includes(s)) {
+          if (knownSensors.has(s)) {
             available.add(s);
           }
         }
-      }
-    }
-    // Also check for individually declared sensor data sources
-    for (const key of Object.keys(deviceInfo.configuration.ds)) {
-      if (knownSensors.includes(key)) {
-        available.add(key);
       }
     }
     return Array.from(available);
