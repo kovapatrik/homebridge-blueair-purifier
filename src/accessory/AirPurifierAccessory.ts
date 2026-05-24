@@ -1,8 +1,23 @@
-import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import { CharacteristicValue, Formats, Perms, PlatformAccessory, Service } from 'homebridge';
+import { Characteristic } from 'hap-nodejs';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+
+class CountdownToCleanAir extends Characteristic {
+  static readonly UUID = '2c216842-f525-4640-b5fa-f1a0da82b8c6';
+
+  constructor() {
+    super('Countdown to Clean Air', CountdownToCleanAir.UUID, {
+      format: Formats.UINT16,
+      perms: [Perms.PAIRED_READ, Perms.NOTIFY],
+      unit: 'minutes' as any,
+      minValue: 0,
+      maxValue: 1440,
+    });
+  }
+}
 
 export class AirPurifierAccessory {
   private service: Service;
@@ -12,6 +27,7 @@ export class AirPurifierAccessory {
   private temperatureService?: Service;
   private germShieldService?: Service;
   private nightModeService?: Service;
+  private countdownCharacteristic?: Characteristic;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -127,6 +143,12 @@ export class AirPurifierAccessory {
       this.accessory.removeService(this.nightModeService);
     }
 
+    if (this.configDev.countdownToCleanAir && this.airQualityService) {
+      this.countdownCharacteristic = this.airQualityService.getCharacteristic(CountdownToCleanAir)
+        || this.airQualityService.addCharacteristic(CountdownToCleanAir);
+      this.countdownCharacteristic.onGet(this.getCountdownToCleanAir.bind(this));
+    }
+
     this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
   }
 
@@ -178,6 +200,11 @@ export class AirPurifierAccessory {
           break;
         case 'nightmode':
           this.nightModeService?.updateCharacteristic(this.platform.Characteristic.On, this.getNightMode());
+          break;
+        case 'aireta':
+          if (this.countdownCharacteristic) {
+            this.countdownCharacteristic.updateValue(this.getCountdownToCleanAir());
+          }
           break;
       }
 
@@ -325,5 +352,9 @@ export class AirPurifierAccessory {
   async setNightMode(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting night mode to ${value}`);
     await this.device.setState('nightmode', value as boolean);
+  }
+
+  getCountdownToCleanAir(): CharacteristicValue {
+    return (this.device.state.aireta as number) || 0;
   }
 }
