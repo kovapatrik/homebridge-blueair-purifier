@@ -58,6 +58,7 @@
   "dependencies": {
     "@homebridge/plugin-ui-utils": "^1.0.3",
     "async-mutex": "^0.5.0",
+    "fakegato-history": "^0.6.7",
     "lodash": "^4.17.21"
   }
 }
