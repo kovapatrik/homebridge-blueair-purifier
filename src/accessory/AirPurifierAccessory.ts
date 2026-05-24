@@ -1,4 +1,5 @@
 import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import fakegato from 'fakegato-history';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
 import { DeviceConfig } from '../platformUtils';
@@ -12,6 +13,7 @@ export class AirPurifierAccessory {
   private temperatureService?: Service;
   private germShieldService?: Service;
   private nightModeService?: Service;
+  private historyService?: Service;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -127,6 +129,14 @@ export class AirPurifierAccessory {
       this.accessory.removeService(this.nightModeService);
     }
 
+    if (this.configDev.history && this.configDev.airQualitySensor) {
+      const FakeGatoHistoryService = fakegato(this.platform.api);
+      this.historyService = new FakeGatoHistoryService('room', this.accessory, {
+        storage: 'fs',
+        log: this.platform.log,
+      });
+    }
+
     this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
   }
 
@@ -193,6 +203,13 @@ export class AirPurifierAccessory {
 
       if (updateAirQuality) {
         this.airQualityService?.updateCharacteristic(this.platform.Characteristic.AirQuality, this.getAirQuality());
+        if (this.historyService) {
+          const ppm = this.device.sensorData.pm2_5 || 0;
+          (this.historyService as any).addEntry({
+            time: Math.round(Date.now() / 1000),
+            ppm: ppm,
+          });
+        }
       }
     }
   }
