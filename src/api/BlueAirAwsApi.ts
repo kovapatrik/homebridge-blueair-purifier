@@ -185,10 +185,13 @@ export default class BlueAirAwsApi {
       };
     });
 
-    // For devices with empty sensordata (e.g. Blue 40/SP4i), fetch from the
-    // historical telemetry endpoint which aggregates 5-minute sensor readings.
+    // For devices that report no air-quality data (e.g. Blue 40/SP4i), fetch from
+    // the historical telemetry endpoint which aggregates 5-minute sensor readings.
+    // Check for the AQI inputs specifically, not just any sensor data — a device may
+    // return non-AQ sensors (fanspeed/temperature/humidity) while still lacking PM/VOC.
+    const aqiSensors: (keyof BlueAirDeviceSensorData)[] = ['pm2_5', 'pm10', 'voc'];
     for (const status of deviceStatuses) {
-      if (Object.keys(status.sensorData).length === 0) {
+      if (!aqiSensors.some((key) => key in status.sensorData)) {
         const deviceInfo = data.deviceInfo.find((d) => d.id === status.id);
         const availableSensors = this.getAvailableSensorNames(deviceInfo);
         if (availableSensors.length > 0) {
@@ -245,11 +248,15 @@ export default class BlueAirAwsApi {
       'GET',
     );
 
-    if (!Array.isArray(data) || data.length === 0 || !data[0].datapoints || data[0].datapoints.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
       return {};
     }
 
-    const entry = data[0];
+    const entry = data.find((e) => e.did === uuid) ?? data[0];
+    if (!entry.datapoints || entry.datapoints.length === 0) {
+      return {};
+    }
+
     const latestDatapoint = entry.datapoints[entry.datapoints.length - 1];
     const sensorData: BlueAirDeviceSensorData = {};
 

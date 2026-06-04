@@ -169,9 +169,6 @@ export class AirPurifierAccessory {
           this.airQualityService?.updateCharacteristic(this.platform.Characteristic.PM10Density, this.getPM10Density());
           updateAirQuality = true;
           break;
-        case 'pm1':
-          updateAirQuality = true;
-          break;
         case 'voc':
           this.airQualityService?.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.getVOCDensity());
           updateAirQuality = true;
