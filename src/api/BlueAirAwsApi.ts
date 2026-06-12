@@ -79,6 +79,8 @@ export default class BlueAirAwsApi {
   private mutex: Mutex;
 
   private accessToken: string;
+  private idToken: string;
+  private userId: string;
   private blueAirApiUrl: string;
 
   constructor(
@@ -86,19 +88,22 @@ export default class BlueAirAwsApi {
     password: string,
     region: Region,
     private readonly logger: Logger,
+    cloudRegion: Region = region,
   ) {
-    const config = getAwsConfig(region);
+    const config = getAwsConfig(cloudRegion);
     this.blueAirApiUrl = `https://${config.restApiId}.execute-api.${config.awsRegion}.amazonaws.com/prod/c`;
 
     this.mutex = new Mutex();
 
     this.logger.debug(`Creating BlueAir API instance with config: ${JSON.stringify(config)} and username: ${username}\
-    and region: ${region}`);
+    and auth region: ${region}, cloud region: ${cloudRegion}`);
 
     this.gigyaApi = new GigyaApi(username, password, region, logger);
 
     this.last_login = 0;
     this.accessToken = '';
+    this.idToken = '';
+    this.userId = '';
   }
 
   async login(): Promise<void> {
@@ -106,10 +111,12 @@ export default class BlueAirAwsApi {
 
     const { token, secret } = await this.gigyaApi.getGigyaSession();
     const { jwt } = await this.gigyaApi.getGigyaJWT(token, secret);
-    const { accessToken } = await this.getAwsAccessToken(jwt);
+    const { accessToken, idToken, userId } = await this.getAwsAccessToken(jwt);
 
     this.last_login = Date.now();
     this.accessToken = accessToken;
+    this.idToken = idToken;
+    this.userId = userId;
 
     this.logger.debug('Logged in');
   }
@@ -147,7 +154,8 @@ export default class BlueAirAwsApi {
         include: uuids.map((uuid) => ({ filter: { o: `= ${uuid}` } })),
       },
     };
-    const data = await this.apiCall<BlueAirDeviceStatusResponse>(`/${accountUuid}/r/initial`, body);
+    const userId = this.userId || accountUuid;
+    const data = await this.apiCall<BlueAirDeviceStatusResponse>(`/${userId}/r/initial`, body);
 
     if (!data.deviceInfo) {
       throw new Error('getDeviceStatus error: no deviceInfo in response');
@@ -202,7 +210,7 @@ export default class BlueAirAwsApi {
     // this.logger.debug(`setDeviceStatus response: ${JSON.stringify(response)}`);
   }
 
-  private async getAwsAccessToken(jwt: string): Promise<{ accessToken: string }> {
+  private async getAwsAccessToken(jwt: string): Promise<{ accessToken: string; idToken: string; userId: string }> {
     this.logger.debug('Getting AWS access token...');
 
     const response = await this.apiCall('/login', undefined, 'POST', {
@@ -214,9 +222,16 @@ export default class BlueAirAwsApi {
       throw new Error(`AWS access token error: ${JSON.stringify(response)}`);
     }
 
+    const accessToken = response.access_token as string;
+    const tokenPayload = JSON.parse(Buffer.from(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()) as {
+      username?: string;
+    };
+
     this.logger.debug('AWS access token received');
     return {
-      accessToken: response.access_token,
+      accessToken,
+      idToken: response.id_token ?? jwt,
+      userId: tokenPayload.username ?? '',
     };
   }
 
@@ -233,7 +248,7 @@ export default class BlueAirAwsApi {
           Connection: 'keep-alive',
           'Accept-Encoding': 'gzip, deflate, br',
           Authorization: `Bearer ${this.accessToken}`,
-          idtoken: this.accessToken,
+          idtoken: this.idToken || this.accessToken,
           ...headers,
         },
         body: JSON.stringify(data),

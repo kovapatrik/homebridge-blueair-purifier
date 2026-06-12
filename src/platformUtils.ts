@@ -3,6 +3,7 @@ export type Config = {
   username: string;
   password: string;
   region: Region;
+  cloudRegion?: Region;
   accountUuid: string;
   verboseLogging: boolean;
   uiDebug: boolean;

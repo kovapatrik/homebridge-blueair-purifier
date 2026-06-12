@@ -42,7 +42,13 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       );
     }
 
-    this.blueAirApi = new BlueAirAwsApi(this.platformConfig.username, this.platformConfig.password, this.platformConfig.region, log);
+    this.blueAirApi = new BlueAirAwsApi(
+      this.platformConfig.username,
+      this.platformConfig.password,
+      this.platformConfig.region,
+      log,
+      this.platformConfig.cloudRegion ?? this.platformConfig.region,
+    );
 
     this.api.on('didFinishLaunching', async () => {
       await this.getInitialDeviceStates();
