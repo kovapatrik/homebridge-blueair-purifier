@@ -29,6 +29,12 @@
         "default": "Default (all other regions)",
         "required": true
       },
+      "cloudRegion": {
+        "title": "Cloud Region Override",
+        "description": "Optional BlueCloud device-control region. Leave unset to use Region. Some accounts authenticate in one region but their live device-control plane is in another.",
+        "type": "string",
+        "enum": ["Default (all other regions)", "Australia", "China", "Russia", "USA"]
+      },
       "accountUuid": {
         "title": "Account UUID",
         "description": "Account UUID for BlueAir account. This should be filled in automatically in the discovery process.",
@@ -117,7 +123,7 @@
           "expandable": true,
           "expanded": true,
           "title": "Common Settings",
-          "items": ["name", "username", "password", "region", "accountUuid", "verboseLogging", "uiDebug", "pollingInterval"]
+          "items": ["name", "username", "password", "region", "cloudRegion", "accountUuid", "verboseLogging", "uiDebug", "pollingInterval"]
         },
         {
           "key": "devices",
