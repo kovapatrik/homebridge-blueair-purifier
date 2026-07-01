@@ -1,6 +1,14 @@
 # Changelog
 
 # v1.1.0
+## [1.1.1](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.1.0...v1.1.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* support split Blueair cloud regions ([493d6dd](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/493d6dd77191b4a72bcdd99672941125ae382ed0))
+* support split Blueair cloud regions ([84475d0](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/84475d0455ef004661a2660a766c1b2383bed10b))
+
 ## 2026-01-07
 - fix: correct handling of state/sensor updates, so the states of the accessory in the Home app refreshes correctly
 - fix: correct mutex usage
