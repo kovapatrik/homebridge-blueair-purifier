@@ -65,6 +65,10 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 | HealthProtect                                            |      Y       |         Y         |      Y       |      Y       |        N        |     Y      |      Y      |
 | Blue Pure                                                |      Y       |         Y         |      Y       |      N       |        N        |     Y      |      N      |
 
+## Contribution
+
+Help is always welcome. If you'd like to get involved, check out the [contribution notes](CONTRIBUTING.md).
+
 ## Credits
 Inspired by the work of [@fsj21](https://github.com/fjs21) on the Amazon Web Services (AWS) API and construction of the documentation.
 
