@@ -1,6 +1,14 @@
 # Changelog
 
 # v1.1.0
+## [1.1.2](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.1.1...v1.1.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* use PAT for release-please to trigger publish workflow [skip ci] ([623bcd2](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/623bcd22e9ce86650debc33c82fc5f33a7b04147))
+* use workflow_call instead [skip ci] ([817f8b0](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/817f8b0d570d4068b7fdbe59a28c18454edebb21))
+
 ## [1.1.1](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.1.0...v1.1.1) (2026-06-30)
 
 
