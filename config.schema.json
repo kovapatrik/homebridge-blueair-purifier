@@ -108,6 +108,11 @@
               "title": "Night Mode",
               "description": "Toggles if the night mode switch service is created with the accessory.",
               "type": "boolean"
+            },
+            "countdownToCleanAir": {
+              "title": "Countdown to Clean Air",
+              "description": "Expose the device's estimated minutes to clean air as a custom characteristic. Visible in Eve and Controller for HomeKit.",
+              "type": "boolean"
             }
           }
         }
@@ -139,7 +144,8 @@
             "devices[].airQualitySensor",
             "devices[].temperatureSensor",
             "devices[].germShield",
-            "devices[].nightMode"
+            "devices[].nightMode",
+            "devices[].countdownToCleanAir"
           ]
         }
       ]
