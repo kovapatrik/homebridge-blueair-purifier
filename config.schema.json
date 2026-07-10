@@ -108,6 +108,11 @@
               "title": "Night Mode",
               "description": "Toggles if the night mode switch service is created with the accessory.",
               "type": "boolean"
+            },
+            "history": {
+              "title": "Eve History",
+              "description": "Enable logging of PM2.5 data for Eve app graphs. Requires the Eve app on iOS.",
+              "type": "boolean"
             }
           }
         }
@@ -139,7 +144,8 @@
             "devices[].airQualitySensor",
             "devices[].temperatureSensor",
             "devices[].germShield",
-            "devices[].nightMode"
+            "devices[].nightMode",
+            "devices[].history"
           ]
         }
       ]
