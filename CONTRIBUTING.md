@@ -1,4 +1,4 @@
-# Contributing to homebridge-midea-platform
+# Contributing to homebridge-blueair-platform
 
 ## AI Policy
 
