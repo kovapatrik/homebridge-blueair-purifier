@@ -1,6 +1,7 @@
 import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
+import { AutoModeStrategy, getAutoModeStrategy } from '../device/AutoModeStrategy';
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
 
@@ -12,6 +13,7 @@ export class AirPurifierAccessory {
   private temperatureService?: Service;
   private germShieldService?: Service;
   private nightModeService?: Service;
+  private autoModeStrategy: AutoModeStrategy;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -19,6 +21,8 @@ export class AirPurifierAccessory {
     protected readonly device: BlueAirDevice,
     protected readonly configDev: DeviceConfig,
   ) {
+    this.autoModeStrategy = getAutoModeStrategy(this.device.deviceType);
+
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'BlueAir')
@@ -140,6 +144,7 @@ export class AirPurifierAccessory {
           updateState = true;
           break;
         case 'automode':
+        case 'apsubmode':
           this.service.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, this.getTargetAirPurifierState());
           break;
         case 'childlock':
@@ -208,7 +213,7 @@ export class AirPurifierAccessory {
 
   getCurrentAirPurifierState(): CharacteristicValue {
     if (this.device.state.standby === false) {
-      return this.device.state.automode && this.device.state.fanspeed === 0
+      return this.autoModeStrategy.isAuto(this.device.state) && this.device.state.fanspeed === 0
         ? this.platform.Characteristic.CurrentAirPurifierState.IDLE
         : this.platform.Characteristic.CurrentAirPurifierState.PURIFYING_AIR;
     }
@@ -217,14 +222,17 @@ export class AirPurifierAccessory {
   }
 
   getTargetAirPurifierState(): CharacteristicValue {
-    return this.device.state.automode
+    return this.autoModeStrategy.isAuto(this.device.state)
       ? this.platform.Characteristic.TargetAirPurifierState.AUTO
       : this.platform.Characteristic.TargetAirPurifierState.MANUAL;
   }
 
   async setTargetAirPurifierState(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting target air purifier state to ${value}`);
-    await this.device.setState('automode', value === this.platform.Characteristic.TargetAirPurifierState.AUTO);
+    const { attribute, value: attributeValue } = this.autoModeStrategy.setAuto(
+      value === this.platform.Characteristic.TargetAirPurifierState.AUTO,
+    );
+    await this.device.setState(attribute, attributeValue);
   }
 
   getLockPhysicalControls(): CharacteristicValue {

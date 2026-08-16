@@ -26,6 +26,7 @@ export type BlueAirDeviceState = {
   nightmode?: boolean;
   mfv?: string;
   automode?: boolean;
+  apsubmode?: number;
   ofv?: string;
   brightness?: number;
   safetyswitch?: boolean;
@@ -50,6 +51,7 @@ export type BlueAirDeviceSensorData = {
 export type BlueAirDeviceStatus = {
   id: string;
   name: string;
+  sku: string;
   state: BlueAirDeviceState;
   sensorData: BlueAirDeviceSensorData;
 };
@@ -165,6 +167,7 @@ export default class BlueAirAwsApi {
       return {
         id: device.id,
         name: device.configuration.di.name,
+        sku: device.configuration.di.sku,
         sensorData: device.sensordata.reduce((acc, sensor) => {
           const key = BlueAirDeviceSensorDataMap[sensor.n];
           if (key) {

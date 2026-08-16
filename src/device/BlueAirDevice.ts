@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus, FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+import { BlueAirDeviceType, getDeviceType } from './BlueAirDeviceType';
 import { Mutex } from 'async-mutex';
 
 type AQILevels = {
@@ -59,6 +60,8 @@ export class BlueAirDevice extends EventEmitter {
 
   public readonly id: string;
   public readonly name: string;
+  public readonly sku: string;
+  public readonly deviceType: BlueAirDeviceType;
 
   private mutex: Mutex;
 
@@ -70,6 +73,8 @@ export class BlueAirDevice extends EventEmitter {
     super();
     this.id = device.id;
     this.name = device.name;
+    this.sku = device.sku;
+    this.deviceType = getDeviceType(device.sku);
 
     this.state = device.state;
     this.sensorData = {
