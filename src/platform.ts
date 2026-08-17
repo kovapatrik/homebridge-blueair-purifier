@@ -120,6 +120,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     }
 
     const blueAirDevice = new BlueAirDevice(device);
+    this.log.info(`[${device.name}] Device type is ${blueAirDevice.deviceType}`);
     this.devices.push(blueAirDevice);
 
     blueAirDevice.on('setState', async ({ id, name, attribute, value }) => {

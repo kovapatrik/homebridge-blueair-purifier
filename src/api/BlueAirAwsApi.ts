@@ -26,6 +26,7 @@ export type BlueAirDeviceState = {
   nightmode?: boolean;
   mfv?: string;
   automode?: boolean;
+  apsubmode?: number;
   ofv?: string;
   brightness?: number;
   safetyswitch?: boolean;
@@ -50,6 +51,7 @@ export type BlueAirDeviceSensorData = {
 export type BlueAirDeviceStatus = {
   id: string;
   name: string;
+  sku: string;
   state: BlueAirDeviceState;
   sensorData: BlueAirDeviceSensorData;
 };
@@ -165,6 +167,7 @@ export default class BlueAirAwsApi {
       return {
         id: device.id,
         name: device.configuration.di.name,
+        sku: device.configuration.di.sku,
         sensorData: device.sensordata.reduce((acc, sensor) => {
           const key = BlueAirDeviceSensorDataMap[sensor.n];
           if (key) {
@@ -331,6 +334,7 @@ export default class BlueAirAwsApi {
     const release = await this.mutex.acquire();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
+    this.logger.debug(`[AWS] apiCall request: ${method} ${this.blueAirApiUrl}${url}, body: ${JSON.stringify(data)}`);
     try {
       const response = await fetch(`${this.blueAirApiUrl}${url}`, {
         method: method,
@@ -346,6 +350,7 @@ export default class BlueAirAwsApi {
         signal: controller.signal,
       });
       const json = await response.json();
+      this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
       if (response.status !== 200) {
         throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
       }

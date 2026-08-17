@@ -65,6 +65,7 @@ export type BlueAirDeviceStatusResponse = {
     configuration: {
       di: {
         name: string;
+        sku: string;
       };
       ds?: Record<string, { sn?: string[] }>;
     };
