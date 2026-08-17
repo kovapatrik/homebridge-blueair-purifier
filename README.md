@@ -70,7 +70,7 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 Help is always welcome. If you'd like to get involved, check out the [contribution notes](CONTRIBUTING.md).
 
 ## Credits
-Inspired by the work of [@fsj21](https://github.com/fjs21) on the Amazon Web Services (AWS) API and construction of the documentation.
+Inspired by the work of [@fsj21](https://github.com/fjs21) on the Amazon Web Services (AWS) API and construction of the documentation. Used part of the [blueair_api](https://github.com/dahlb/blueair_api) implementation as reference to mine. 
 
 ### Trademarks
 

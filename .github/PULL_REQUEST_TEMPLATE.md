@@ -15,7 +15,7 @@
 
 **Checklist**
 
-- [ ] I read the [contribution guidelines](/CONTRIBUTING.md)
-- [ ] If this PR used AI assistance, I followed the [AI Contribution Policy](/CONTRIBUTING.md#ai-policy)
+- [ ] I read the [contribution guidelines](https://github.com/kovapatrik/homebridge-blueair-purifier/blob/HEAD/CONTRIBUTING.md)
+- [ ] If this PR used AI assistance, I followed the [AI Contribution Policy](https://github.com/kovapatrik/homebridge-blueair-purifier/blob/HEAD/CONTRIBUTING.md#ai-policy)
 - [ ] I tested this on real hardware (required for device-specific changes)
 - [ ] I ran `npm run lint` and there are no warnings
