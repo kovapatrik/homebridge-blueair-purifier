@@ -1,7 +1,7 @@
 import { Logger } from 'homebridge';
 import { Region } from '../platformUtils';
 import GigyaApi from './GigyaApi';
-import { BLUEAIR_API_TIMEOUT, BlueAirDeviceStatusResponse, LOGIN_EXPIRATION, getAwsConfig } from './Consts';
+import { BLUEAIR_API_TIMEOUT, BlueAirDeviceStatusResponse, BlueAirTelemetryResponse, LOGIN_EXPIRATION, getAwsConfig } from './Consts';
 import { Mutex } from 'async-mutex';
 
 type BlueAirDeviceDiscovery = {
@@ -185,7 +185,98 @@ export default class BlueAirAwsApi {
       };
     });
 
+    // For devices that report no air-quality data (e.g. Blue 40/SP4i), fetch from
+    // the historical telemetry endpoint which aggregates 5-minute sensor readings.
+    // Check for the AQI inputs specifically, not just any sensor data — a device may
+    // return non-AQ sensors (fanspeed/temperature/humidity) while still lacking PM/VOC.
+    const aqiSensors: (keyof BlueAirDeviceSensorData)[] = ['pm2_5', 'pm10', 'voc'];
+    for (const status of deviceStatuses) {
+      if (!aqiSensors.some((key) => key in status.sensorData)) {
+        const deviceInfo = data.deviceInfo.find((d) => d.id === status.id);
+        const availableSensors = this.getAvailableSensorNames(deviceInfo);
+        if (availableSensors.length > 0) {
+          try {
+            const telemetry = await this.getDeviceTelemetry(accountUuid, status.id, availableSensors);
+            Object.assign(status.sensorData, telemetry);
+            this.logger.debug(`[${status.name}] Sensor data from telemetry: ${JSON.stringify(telemetry)}`);
+          } catch (error) {
+            this.logger.debug(`[${status.name}] Telemetry fallback failed: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
     return deviceStatuses;
+  }
+
+  private getAvailableSensorNames(deviceInfo?: BlueAirDeviceStatusResponse['deviceInfo'][0]): string[] {
+    if (!deviceInfo?.configuration?.ds) {
+      return [];
+    }
+    const knownSensors = new Set(Object.keys(BlueAirDeviceSensorDataMap));
+    const available = new Set<string>();
+    for (const [key, entry] of Object.entries(deviceInfo.configuration.ds)) {
+      if (knownSensors.has(key)) {
+        available.add(key);
+      }
+      if (entry.sn) {
+        for (const s of entry.sn) {
+          if (knownSensors.has(s)) {
+            available.add(s);
+          }
+        }
+      }
+    }
+    return Array.from(available);
+  }
+
+  async getDeviceTelemetry(accountUuid: string, uuid: string, sensorNames: string[]): Promise<BlueAirDeviceSensorData> {
+    const now = Math.floor(Date.now() / 1000);
+    const oneHourAgo = now - 3600;
+
+    const params = new URLSearchParams();
+    params.append('did', uuid);
+    params.append('from', oneHourAgo.toString());
+    params.append('to', now.toString());
+    for (const sensor of sensorNames) {
+      params.append('s', sensor);
+    }
+
+    const data = await this.apiCall<BlueAirTelemetryResponse>(
+      `/${accountUuid}/r/telemetry/5m/historical?${params.toString()}`,
+      undefined,
+      'GET',
+    );
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return {};
+    }
+
+    const entry = data.find((e) => e.did === uuid) ?? data[0];
+    if (!entry.datapoints || entry.datapoints.length === 0) {
+      return {};
+    }
+
+    const latestDatapoint = entry.datapoints[entry.datapoints.length - 1];
+    const sensorData: BlueAirDeviceSensorData = {};
+
+    // First element is the timestamp, sensor values start at index 1
+    for (let i = 0; i < entry.sensors.length; i++) {
+      const rawValue = latestDatapoint[i + 1];
+      if (rawValue === null || rawValue === undefined || rawValue === '') {
+        continue;
+      }
+      const value = parseFloat(rawValue);
+      if (isNaN(value)) {
+        continue;
+      }
+      const key = BlueAirDeviceSensorDataMap[entry.sensors[i]];
+      if (key) {
+        sensorData[key] = value;
+      }
+    }
+
+    return sensorData;
   }
 
   async setDeviceStatus(uuid: string, state: string, value: number | boolean): Promise<void> {

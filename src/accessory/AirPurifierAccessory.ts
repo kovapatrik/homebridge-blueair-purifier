@@ -161,7 +161,7 @@ export class AirPurifierAccessory {
           this.ledService?.updateCharacteristic(this.platform.Characteristic.On, this.getLedOn());
           this.ledService?.updateCharacteristic(this.platform.Characteristic.Brightness, this.getLedBrightness());
           break;
-        case 'pm25':
+        case 'pm2_5':
           this.airQualityService?.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.getPM2_5Density());
           updateAirQuality = true;
           break;

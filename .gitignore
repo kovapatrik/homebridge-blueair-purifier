@@ -1,6 +1,9 @@
 # Ignore compiled code
 dist
 
+# macOS
+.DS_Store
+
 # ------------- Defaults ------------- #
 
 # Logs

@@ -170,7 +170,7 @@ export class BlueAirDevice extends EventEmitter {
     for (const [k, v] of Object.entries(newState.sensorData)) {
       if (this.sensorData[k] !== v) {
         changedSensorData[k] = v;
-        if (k === 'pm25' || k === 'pm10' || k === 'voc') {
+        if (k === 'pm2_5' || k === 'pm10' || k === 'voc') {
           changedSensorData.aqi = this.calculateAqi();
         }
       }
