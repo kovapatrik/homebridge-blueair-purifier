@@ -273,7 +273,7 @@ export class AirPurifierAccessory {
   }
 
   getFilterLifeLevel(): CharacteristicValue {
-    return 100 - (this.device.state.filterusage || 0);
+    return Math.min(100, Math.max(0, 100 - (this.device.state.filterusage || 0)));
   }
 
   getCurrentTemperature(): CharacteristicValue {
