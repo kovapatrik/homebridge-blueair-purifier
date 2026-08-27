@@ -1,6 +1,13 @@
 # Changelog
 
 # v1.1.0
+## [1.2.1](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.2.0...v1.2.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* custom ui delete empty objects wont leave empty space ([63c0e28](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/63c0e28098eae154191fb6717163a0fab8e541b7))
+
 ## [1.2.0](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.1.1...v1.2.0) (2026-08-17)
 
 
