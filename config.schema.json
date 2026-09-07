@@ -52,7 +52,7 @@
       },
       "pollingInterval": {
         "title": "Polling Interval",
-        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 15 seconds (15000 miliseconds).",
+        "description": "Interval in milliseconds to poll the BlueAir API for updates. Recommended minimum is 30000 (30 seconds). The plugin will automatically back off when the API returns a rate-limit response (status 229 or 429).",
         "type": "number"
       },
       "devices": {

@@ -3,7 +3,7 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { Config, defaultConfig } from './platformUtils';
 import { defaultsDeep } from 'lodash';
-import BlueAirAwsApi, { BlueAirDeviceStatus } from './api/BlueAirAwsApi';
+import BlueAirAwsApi, { BlueAirDeviceStatus, RateLimitError } from './api/BlueAirAwsApi';
 import { BlueAirDevice } from './device/BlueAirDevice';
 import { AirPurifierAccessory } from './accessory/AirPurifierAccessory';
 import EventEmitter from 'events';
@@ -22,6 +22,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
 
   private devices: BlueAirDevice[] = [];
   private polling: NodeJS.Timeout | null = null;
+  private consecutiveRateLimitFailures = 0;
 
   constructor(
     public readonly log: Logger,
@@ -64,6 +65,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
 
   async getValidDevicesStatus() {
     this.log.debug('Updating devices states...');
+    let nextDelayMs = this.platformConfig.pollingInterval;
     try {
       const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, this.existingUuids);
       for (const device of devices) {
@@ -76,12 +78,19 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
         blueAirDevice.emit('update', device);
       }
       this.log.debug('Devices states updated!');
+      this.consecutiveRateLimitFailures = 0;
     } catch (error) {
       const err = error as Error;
-      this.log.warn('Error getting valid devices status, reason:' + err.message + '. Retrying in 5 seconds...');
+      if (error instanceof RateLimitError) {
+        this.consecutiveRateLimitFailures++;
+        // Exponential backoff of the outer poll on repeated rate-limits: 1x, 2x, 4x, 8x, 16x cap.
+        const multiplier = 2 ** Math.min(this.consecutiveRateLimitFailures, 4);
+        nextDelayMs = this.platformConfig.pollingInterval * multiplier;
+      }
+      this.log.warn(`Error getting valid devices status, reason: ${err.message}. Retrying in ${nextDelayMs}ms...`);
       this.log.debug('Error stack:', err.stack);
     } finally {
-      this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
+      this.polling = setTimeout(this.getValidDevicesStatus.bind(this), nextDelayMs);
     }
   }
 
@@ -132,6 +141,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       try {
         await this.blueAirApi.setDeviceStatus(id, attribute, value);
         success = true;
+        this.consecutiveRateLimitFailures = 0;
       } catch (error) {
         this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
       } finally {
