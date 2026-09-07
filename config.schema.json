@@ -52,7 +52,7 @@
       },
       "pollingInterval": {
         "title": "Polling Interval",
-        "description": "Interval in milliseconds to poll the BlueAir API for updates. Recommended minimum is 30000 (30 seconds). The plugin will automatically back off when the API returns a rate-limit response (status 229 or 429).",
+        "description": "Interval in milliseconds to poll the BlueAir API for updates. Note that BlueAir's own API docs state device data only refreshes on their servers every 5 minutes, so polling faster than that returns the same data. The plugin automatically backs off when the API returns a rate-limit response (status 229 or 429).",
         "type": "number"
       },
       "devices": {

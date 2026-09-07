@@ -42,7 +42,7 @@ export const defaultConfig: Config = {
   password: '',
   accountUuid: '',
   region: Region.EU,
-  pollingInterval: 30000,
+  pollingInterval: 15000,
   devices: [],
 };
 
