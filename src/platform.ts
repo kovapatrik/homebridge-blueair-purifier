@@ -65,11 +65,13 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.accessories.push(accessory);
   }
 
-  // Exponential backoff of the outer poll on repeated rate-limits: 1x, 2x, 4x, 8x, 16x,
-  // then hard-capped at MAX_POLL_BACKOFF_MS so the plugin never goes silent for longer
-  // than that regardless of pollingInterval.
+  // Exponential backoff of the outer poll on repeated rate-limits: 1x, 2x, 4x, 8x, ...
+  // Ceiling is the absolute MAX_POLL_BACKOFF_MS rather than a multiplier cap, so the
+  // max silence is the same (~30 min) regardless of pollingInterval. Letting the counter
+  // grow unbounded also makes decay-on-success a proper gradual ramp — a long jail
+  // requires proportionally many successful polls to fully recover.
   private computeBackoffDelayMs(): number {
-    const multiplier = 2 ** Math.min(this.consecutiveRateLimitFailures, 4);
+    const multiplier = 2 ** this.consecutiveRateLimitFailures;
     return Math.min(this.platformConfig.pollingInterval * multiplier, MAX_POLL_BACKOFF_MS);
   }
 
