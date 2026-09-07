@@ -87,7 +87,10 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       this.consecutiveRateLimitFailures++;
       const delayMs = this.computeBackoffDelayMs();
       this.log.warn(`Rate-limited during initial device fetch: ${(error as Error).message}. Retrying initialization in ${delayMs}ms...`);
-      setTimeout(() => this.initializeAndStartPolling(), delayMs);
+      if (this.polling) {
+        clearTimeout(this.polling);
+      }
+      this.polling = setTimeout(() => this.initializeAndStartPolling(), delayMs);
     }
   }
 
@@ -116,6 +119,12 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       this.log.warn(`Error getting valid devices status, reason: ${err.message}. Retrying in ${nextDelayMs}ms...`);
       this.log.debug('Error stack:', err.stack);
     } finally {
+      // Defensive clear: a concurrent setState may have scheduled its own poll while we
+      // were awaiting the API. Without this, both timers stay active and create parallel
+      // polling loops (visible in logs as two identical warns in the same second).
+      if (this.polling) {
+        clearTimeout(this.polling);
+      }
       this.polling = setTimeout(this.getValidDevicesStatus.bind(this), nextDelayMs);
     }
   }
