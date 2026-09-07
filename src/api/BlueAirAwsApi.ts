@@ -404,10 +404,10 @@ export default class BlueAirAwsApi {
         const message = `API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`;
 
         if (BLUEAIR_RATE_LIMIT_STATUSES.has(response.status)) {
-          // BlueAir's own docs say the underlying data only refreshes every 5 minutes.
-          // Retrying a rate-limit response within seconds definitionally fetches the
-          // same stale data — and extends the throttle window for the whole account.
-          // Fail fast; let the platform-level backoff decide when to try again.
+          // Retrying a rate-limit response immediately is what got us throttled in the
+          // first place — and since BlueAir's throttle is account-scoped, every extra
+          // request extends the pain for the user's own mobile app as well. Fail fast;
+          // let the platform-level backoff decide when to try again.
           throw new RateLimitError(message);
         }
 
