@@ -1,5 +1,11 @@
 import EventEmitter from 'events';
-import { BlueAirDeviceSensorData, BlueAirDeviceState, BlueAirDeviceStatus, FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+import {
+  AQI_SENSOR_KEYS,
+  BlueAirDeviceSensorData,
+  BlueAirDeviceState,
+  BlueAirDeviceStatus,
+  FullBlueAirDeviceState,
+} from '../api/BlueAirAwsApi';
 import { BlueAirDeviceType, getDeviceType } from './BlueAirDeviceType';
 import { Mutex } from 'async-mutex';
 
@@ -8,6 +14,10 @@ type AQILevels = {
   AQI_HI: number[];
   CONC_LO: number[];
   CONC_HI: number[];
+  // Decimal places a reading is truncated to before the bands are applied. The bands
+  // leave deliberate gaps (PM10 stops at 54 and picks up again at 55) which only close
+  // once the reading is cut down to the precision the pollutant is reported at.
+  DECIMALS: number;
 };
 
 // https://forum.airnowtech.org/t/the-aqi-equation-2024-valid-beginning-may-6th-2024
@@ -17,18 +27,21 @@ const AQI: { [key: string]: AQILevels } = {
     AQI_HI: [50, 100, 150, 200, 300, 500],
     CONC_LO: [0.0, 9.1, 35.5, 55.5, 125.5, 225.5],
     CONC_HI: [9.0, 35.4, 55.4, 125.4, 225.4, 325.4],
+    DECIMALS: 1,
   },
   PM10: {
     AQI_LO: [0, 51, 101, 151, 201, 301],
     AQI_HI: [50, 100, 150, 200, 300, 500],
     CONC_LO: [0, 55, 155, 255, 355, 425],
     CONC_HI: [54, 154, 254, 354, 424, 604],
+    DECIMALS: 0,
   },
   VOC: {
     AQI_LO: [0, 51, 101, 151, 201, 301],
     AQI_HI: [50, 100, 150, 200, 300, 500],
     CONC_LO: [0, 221, 661, 1431, 2201, 3301],
     CONC_HI: [220, 660, 1430, 2200, 3300, 5500],
+    DECIMALS: 0,
   },
 };
 
@@ -77,11 +90,8 @@ export class BlueAirDevice extends EventEmitter {
     this.deviceType = getDeviceType(device.sku);
 
     this.state = device.state;
-    this.sensorData = {
-      ...device.sensorData,
-      aqi: undefined,
-    };
-    this.sensorData.aqi = this.calculateAqi();
+    this.sensorData = { ...device.sensorData };
+    this.sensorData.aqi = this.calculateAqi(this.sensorData);
 
     this.mutex = new Mutex();
     this.currentChanges = {
@@ -172,43 +182,75 @@ export class BlueAirDevice extends EventEmitter {
         changedState[k] = v;
       }
     }
+    let aqiInputChanged = false;
     for (const [k, v] of Object.entries(newState.sensorData)) {
       if (this.sensorData[k] !== v) {
         changedSensorData[k] = v;
-        if (k === 'pm2_5' || k === 'pm10' || k === 'voc') {
-          changedSensorData.aqi = this.calculateAqi();
+        if (AQI_SENSOR_KEYS.includes(k)) {
+          aqiInputChanged = true;
         }
       }
     }
+
+    if (aqiInputChanged) {
+      // this.sensorData still holds the previous poll until notifyStateUpdate applies
+      // the changes, so the AQI has to be worked out against the merged readings.
+      // Calculating it off this.sensorData left HomeKit a poll behind the sensors.
+      const aqi = this.calculateAqi({ ...this.sensorData, ...changedSensorData });
+      if (aqi !== this.sensorData.aqi) {
+        changedSensorData.aqi = aqi;
+      }
+    }
+
     await this.notifyStateUpdate(changedState, changedSensorData);
   }
 
-  private calculateAqi(): number | undefined {
-    if (this.sensorData.pm2_5 === undefined && this.sensorData.pm10 === undefined && this.sensorData.voc === undefined) {
+  private calculateAqi(sensorData: BlueAirSensorDataWithAqi): number | undefined {
+    // A sensor the device does not report is left out rather than counted as a reading
+    // of zero, so a missing pollutant cannot pull the overall figure down.
+    const subIndexes = [
+      this.calculateAqiForSensor(sensorData.pm2_5, 'PM2_5'),
+      this.calculateAqiForSensor(sensorData.pm10, 'PM10'),
+      this.calculateAqiForSensor(sensorData.voc, 'VOC'),
+    ].filter((subIndex): subIndex is number => subIndex !== undefined);
+
+    if (subIndexes.length === 0) {
       return undefined;
     }
 
-    const pm2_5 = Math.round((this.sensorData.pm2_5 || 0) * 10) / 10;
-    const pm10 = this.sensorData.pm10 || 0;
-    const voc = this.sensorData.voc || 0;
-
-    const aqi_pm2_5 = this.calculateAqiForSensor(pm2_5, 'PM2_5');
-    const aqi_pm10 = this.calculateAqiForSensor(pm10, 'PM10');
-    const aqi_voc = this.calculateAqiForSensor(voc, 'VOC');
-
-    return Math.max(aqi_pm2_5, aqi_pm10, aqi_voc);
+    return Math.max(...subIndexes);
   }
 
-  private calculateAqiForSensor(value: number, sensor: string) {
+  private calculateAqiForSensor(value: number | undefined, sensor: string): number | undefined {
+    if (value === undefined || isNaN(value)) {
+      return undefined;
+    }
+
     const levels = AQI[sensor];
-    for (let i = 0; i < levels.AQI_LO.length; i++) {
-      if (value >= levels.CONC_LO[i] && value <= levels.CONC_HI[i]) {
+    const top = levels.AQI_LO.length - 1;
+
+    const factor = Math.pow(10, levels.DECIMALS);
+    const concentration = Math.floor(value * factor) / factor;
+
+    if (concentration <= levels.CONC_LO[0]) {
+      return levels.AQI_LO[0];
+    }
+
+    // Readings past the top band are beyond the scale and report at the top of it.
+    // Falling through to a default of 0 used to show wildfire smoke as Excellent.
+    if (concentration >= levels.CONC_HI[top]) {
+      return levels.AQI_HI[top];
+    }
+
+    for (let i = 0; i <= top; i++) {
+      if (concentration <= levels.CONC_HI[i]) {
         return Math.round(
-          ((levels.AQI_HI[i] - levels.AQI_LO[i]) / (levels.CONC_HI[i] - levels.CONC_LO[i])) * (value - levels.CONC_LO[i]) +
+          ((levels.AQI_HI[i] - levels.AQI_LO[i]) / (levels.CONC_HI[i] - levels.CONC_LO[i])) * (concentration - levels.CONC_LO[i]) +
             levels.AQI_LO[i],
         );
       }
     }
-    return 0;
+
+    return levels.AQI_HI[top];
   }
 }
