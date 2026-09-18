@@ -30,6 +30,9 @@ jobs:
       - name: Build the project
         run: npm run build
 
+      - name: Run the tests
+        run: node --test test/*.cjs
+
       - name: List, audit, fix outdated dependencies and build again
         run: |
           npm list --outdated
