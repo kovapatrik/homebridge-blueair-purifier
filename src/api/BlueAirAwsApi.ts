@@ -1,7 +1,14 @@
 import { Logger } from 'homebridge';
 import { Region } from '../platformUtils';
 import GigyaApi from './GigyaApi';
-import { BLUEAIR_API_TIMEOUT, BlueAirDeviceStatusResponse, BlueAirTelemetryResponse, LOGIN_EXPIRATION, getAwsConfig } from './Consts';
+import {
+  BLUEAIR_API_TIMEOUT,
+  BlueAirDeviceStatusResponse,
+  BlueAirTelemetryResponse,
+  LOGIN_EXPIRATION,
+  TELEMETRY_CACHE_TTL,
+  getAwsConfig,
+} from './Consts';
 import { Mutex } from 'async-mutex';
 
 type BlueAirDeviceDiscovery = {
@@ -62,6 +69,9 @@ type BlueAirSetStateBody = {
   vb?: boolean;
 };
 
+// The readings the HomeKit AirQuality calculation is derived from.
+export const AQI_SENSOR_KEYS: (keyof BlueAirDeviceSensorData)[] = ['pm2_5', 'pm10', 'voc'];
+
 export const BlueAirDeviceSensorDataMap: Record<string, keyof BlueAirDeviceSensorData> = {
   fsp0: 'fanspeed',
   hcho: 'hcho',
@@ -85,6 +95,11 @@ export default class BlueAirAwsApi {
   private userId: string;
   private blueAirApiUrl: string;
 
+  private telemetryCache: Map<string, { fetchedAt: number; data: BlueAirDeviceSensorData }>;
+
+  // Sensor keys each device has delivered in a snapshot at least once.
+  private snapshotSensors: Map<string, Set<string>>;
+
   constructor(
     username: string,
     password: string,
@@ -106,6 +121,8 @@ export default class BlueAirAwsApi {
     this.accessToken = '';
     this.idToken = '';
     this.userId = '';
+    this.telemetryCache = new Map();
+    this.snapshotSensors = new Map();
   }
 
   async login(): Promise<void> {
@@ -188,28 +205,76 @@ export default class BlueAirAwsApi {
       };
     });
 
-    // For devices that report no air-quality data (e.g. Blue 40/SP4i), fetch from
-    // the historical telemetry endpoint which aggregates 5-minute sensor readings.
-    // Check for the AQI inputs specifically, not just any sensor data — a device may
-    // return non-AQ sensors (fanspeed/temperature/humidity) while still lacking PM/VOC.
-    const aqiSensors: (keyof BlueAirDeviceSensorData)[] = ['pm2_5', 'pm10', 'voc'];
+    // `/r/initial` is a snapshot of whatever the device last pushed, and some models
+    // (Blue 40/SP4i) never populate `sensordata` at all. Fill in the air quality sensors
+    // a device advertises but has never once delivered, otherwise HomeKit reads them as
+    // a hard 0 forever.
+    //
+    // Sensors the snapshot has delivered before are deliberately left alone. When one of
+    // those is absent from a poll BlueAirDevice keeps the last value, which is fresher
+    // than a telemetry bucket that can be up to 5 minutes old.
     for (const status of deviceStatuses) {
-      if (!aqiSensors.some((key) => key in status.sensorData)) {
-        const deviceInfo = data.deviceInfo.find((d) => d.id === status.id);
-        const availableSensors = this.getAvailableSensorNames(deviceInfo);
-        if (availableSensors.length > 0) {
-          try {
-            const telemetry = await this.getDeviceTelemetry(accountUuid, status.id, availableSensors);
-            Object.assign(status.sensorData, telemetry);
-            this.logger.debug(`[${status.name}] Sensor data from telemetry: ${JSON.stringify(telemetry)}`);
-          } catch (error) {
-            this.logger.debug(`[${status.name}] Telemetry fallback failed: ${(error as Error).message}`);
-          }
+      const seenSensors = this.snapshotSensors.get(status.id) ?? new Set<string>();
+      for (const key of Object.keys(status.sensorData)) {
+        seenSensors.add(key);
+      }
+      this.snapshotSensors.set(status.id, seenSensors);
+
+      const deviceInfo = data.deviceInfo.find((d) => d.id === status.id);
+      const advertisedSensors = this.getAvailableSensorNames(deviceInfo);
+
+      const undeliveredAqiSensor = advertisedSensors.some((name) => {
+        const key = BlueAirDeviceSensorDataMap[name];
+        return key !== undefined && AQI_SENSOR_KEYS.includes(key) && !seenSensors.has(key as string);
+      });
+
+      if (!undeliveredAqiSensor) {
+        continue;
+      }
+
+      const telemetry = await this.getCachedTelemetry(accountUuid, status.id, advertisedSensors);
+      const backfilled: BlueAirDeviceSensorData = {};
+
+      for (const [key, value] of Object.entries(telemetry)) {
+        if (!seenSensors.has(key)) {
+          status.sensorData[key] = value;
+          backfilled[key] = value;
         }
+      }
+
+      if (Object.keys(backfilled).length > 0) {
+        this.logger.debug(`[${status.name}] Sensor data backfilled from telemetry: ${JSON.stringify(backfilled)}`);
       }
     }
 
     return deviceStatuses;
+  }
+
+  /**
+   * Telemetry for a device, reused for {@link TELEMETRY_CACHE_TTL} so that a 15 second
+   * polling interval does not turn into a telemetry call every 15 seconds. On failure
+   * the previous readings are kept and the next attempt waits out the same interval,
+   * which stops a rate limited account from retrying on every poll.
+   */
+  private async getCachedTelemetry(accountUuid: string, uuid: string, sensorNames: string[]): Promise<BlueAirDeviceSensorData> {
+    const cached = this.telemetryCache.get(uuid);
+    if (cached && Date.now() - cached.fetchedAt < TELEMETRY_CACHE_TTL) {
+      return cached.data;
+    }
+
+    if (sensorNames.length === 0) {
+      return {};
+    }
+
+    try {
+      const data = await this.getDeviceTelemetry(accountUuid, uuid, sensorNames);
+      this.telemetryCache.set(uuid, { fetchedAt: Date.now(), data });
+      return data;
+    } catch (error) {
+      this.logger.debug(`Telemetry fetch failed for ${uuid}: ${(error as Error).message}`);
+      this.telemetryCache.set(uuid, { fetchedAt: Date.now(), data: cached?.data ?? {} });
+      return cached?.data ?? {};
+    }
   }
 
   private getAvailableSensorNames(deviceInfo?: BlueAirDeviceStatusResponse['deviceInfo'][0]): string[] {
@@ -260,22 +325,29 @@ export default class BlueAirAwsApi {
       return {};
     }
 
-    const latestDatapoint = entry.datapoints[entry.datapoints.length - 1];
     const sensorData: BlueAirDeviceSensorData = {};
 
-    // First element is the timestamp, sensor values start at index 1
+    // Datapoints run oldest to newest and each sensor is aggregated on its own, so the
+    // newest row is routinely null for sensors that report less often than others.
+    // Reading only that row dropped those sensors entirely; walk back per column
+    // instead and take the most recent value each one actually has.
     for (let i = 0; i < entry.sensors.length; i++) {
-      const rawValue = latestDatapoint[i + 1];
-      if (rawValue === null || rawValue === undefined || rawValue === '') {
-        continue;
-      }
-      const value = parseFloat(rawValue);
-      if (isNaN(value)) {
-        continue;
-      }
       const key = BlueAirDeviceSensorDataMap[entry.sensors[i]];
-      if (key) {
-        sensorData[key] = value;
+      if (!key) {
+        continue;
+      }
+
+      for (let row = entry.datapoints.length - 1; row >= 0; row--) {
+        // First element is the timestamp, sensor values start at index 1
+        const rawValue = entry.datapoints[row][i + 1];
+        if (rawValue === null || rawValue === undefined || rawValue === '') {
+          continue;
+        }
+        const value = parseFloat(rawValue);
+        if (!isNaN(value)) {
+          sensorData[key] = value;
+          break;
+        }
       }
     }
 
