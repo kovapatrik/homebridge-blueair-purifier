@@ -4,6 +4,8 @@ import { BlueAirDevice } from '../device/BlueAirDevice';
 import { AutoModeStrategy, getAutoModeStrategy } from '../device/AutoModeStrategy';
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+import { BlueAirDeviceType } from '../device/BlueAirDeviceType';
+import { CoalescedControl } from '../device/CoalescedControl';
 
 export class AirPurifierAccessory {
   private service: Service;
@@ -14,6 +16,9 @@ export class AirPurifierAccessory {
   private germShieldService?: Service;
   private nightModeService?: Service;
   private autoModeStrategy: AutoModeStrategy;
+  private readonly speedControl: CoalescedControl<CharacteristicValue>;
+  private queuedSpeed?: CharacteristicValue;
+  private speedRequest = 0;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -22,6 +27,15 @@ export class AirPurifierAccessory {
     protected readonly configDev: DeviceConfig,
   ) {
     this.autoModeStrategy = getAutoModeStrategy(this.device.deviceType);
+    this.speedControl = new CoalescedControl(
+      (value) => this.platform.executeCommand(this.device, () => this.setRotationSpeed(value)),
+      this.platform.sliderBufferMs,
+    );
+    this.platform.api?.on('shutdown', () => {
+      this.speedRequest++;
+      this.queuedSpeed = undefined;
+      this.speedControl.cancel();
+    });
 
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
@@ -33,24 +47,44 @@ export class AirPurifierAccessory {
       this.accessory.getService(this.platform.Service.AirPurifier) || this.accessory.addService(this.platform.Service.AirPurifier);
 
     this.service.setCharacteristic(this.platform.Characteristic.Name, this.configDev.name);
-    this.service.getCharacteristic(this.platform.Characteristic.Active).onGet(this.getActive.bind(this)).onSet(this.setActive.bind(this));
+    this.service
+      .getCharacteristic(this.platform.Characteristic.Active)
+      .onGet(() => this.platform.readDevice(this.device, () => this.getActive()))
+      .onSet((value) => {
+        this.platform.log.debug(`[${this.device.name}] HomeKit Active request: ${value}`);
+        if (value === this.platform.Characteristic.Active.INACTIVE) {
+          this.speedRequest++;
+          this.queuedSpeed = undefined;
+          this.speedControl.cancel();
+        }
+        return this.platform.executeCommand(this.device, () => this.setActive(value));
+      });
 
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentAirPurifierState).onGet(this.getCurrentAirPurifierState.bind(this));
+    this.service
+      .getCharacteristic(this.platform.Characteristic.CurrentAirPurifierState)
+      .onGet(() => this.platform.readDevice(this.device, () => this.getCurrentAirPurifierState()));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.TargetAirPurifierState)
-      .onGet(this.getTargetAirPurifierState.bind(this))
-      .onSet(this.setTargetAirPurifierState.bind(this));
+      .onGet(() => this.platform.readDevice(this.device, () => this.getTargetAirPurifierState()))
+      .onSet((value) => this.platform.executeCommand(this.device, () => this.setTargetAirPurifierState(value)));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.LockPhysicalControls)
-      .onGet(this.getLockPhysicalControls.bind(this))
-      .onSet(this.setLockPhysicalControls.bind(this));
+      .onGet(() => this.platform.readDevice(this.device, () => this.getLockPhysicalControls()))
+      .onSet((value) => this.platform.executeCommand(this.device, () => this.setLockPhysicalControls(value)));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.RotationSpeed)
-      .onGet(this.getRotationSpeed.bind(this))
-      .onSet(this.setRotationSpeed.bind(this));
+      .onGet(() => this.platform.readDevice(this.device, () => this.getRotationSpeed()))
+      .onSet((value) => {
+        // Normal polling keeps the original awaited write handler. Only the
+        // opt-in path acknowledges queue acceptance before cloud execution.
+        if (!this.platform.onDemand) {
+          return this.setRotationSpeed(value);
+        }
+        this.queueRotationSpeed(value);
+      });
 
     this.filterMaintenanceService =
       this.accessory.getService(this.platform.Service.FilterMaintenance) ||
@@ -58,20 +92,25 @@ export class AirPurifierAccessory {
 
     this.filterMaintenanceService
       .getCharacteristic(this.platform.Characteristic.FilterChangeIndication)
-      .onGet(this.getFilterChangeIndication.bind(this));
+      .onGet(() => this.platform.readDevice(this.device, () => this.getFilterChangeIndication()));
 
-    this.filterMaintenanceService.getCharacteristic(this.platform.Characteristic.FilterLifeLevel).onGet(this.getFilterLifeLevel.bind(this));
+    this.filterMaintenanceService
+      .getCharacteristic(this.platform.Characteristic.FilterLifeLevel)
+      .onGet(() => this.platform.readDevice(this.device, () => this.getFilterLifeLevel()));
 
     this.ledService = this.accessory.getServiceById(this.platform.Service.Lightbulb, 'Led');
     if (this.configDev.led) {
       this.ledService ??= this.accessory.addService(this.platform.Service.Lightbulb, `${this.device.name} Led`, 'Led');
       this.ledService.setCharacteristic(this.platform.Characteristic.Name, `${this.device.name} Led`);
       this.ledService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} Led`);
-      this.ledService.getCharacteristic(this.platform.Characteristic.On).onGet(this.getLedOn.bind(this)).onSet(this.setLedOn.bind(this));
+      this.ledService
+        .getCharacteristic(this.platform.Characteristic.On)
+        .onGet(() => this.platform.readDevice(this.device, () => this.getLedOn()))
+        .onSet((value) => this.platform.executeCommand(this.device, () => this.setLedOn(value)));
       this.ledService
         .getCharacteristic(this.platform.Characteristic.Brightness)
-        .onGet(this.getLedBrightness.bind(this))
-        .onSet(this.setLedBrightness.bind(this));
+        .onGet(() => this.platform.readDevice(this.device, () => this.getLedBrightness()))
+        .onSet((value) => this.platform.executeCommand(this.device, () => this.setLedBrightness(value)));
     } else if (this.ledService) {
       this.accessory.removeService(this.ledService);
     }
@@ -83,10 +122,18 @@ export class AirPurifierAccessory {
         `${this.device.name} Air Quality`,
         'AirQuality',
       );
-      this.airQualityService.getCharacteristic(this.platform.Characteristic.AirQuality).onGet(this.getAirQuality.bind(this));
-      this.airQualityService.getCharacteristic(this.platform.Characteristic.PM2_5Density).onGet(this.getPM2_5Density.bind(this));
-      this.airQualityService.getCharacteristic(this.platform.Characteristic.PM10Density).onGet(this.getPM10Density.bind(this));
-      this.airQualityService.getCharacteristic(this.platform.Characteristic.VOCDensity).onGet(this.getVOCDensity.bind(this));
+      this.airQualityService
+        .getCharacteristic(this.platform.Characteristic.AirQuality)
+        .onGet(() => this.platform.readDevice(this.device, () => this.getAirQuality()));
+      this.airQualityService
+        .getCharacteristic(this.platform.Characteristic.PM2_5Density)
+        .onGet(() => this.platform.readDevice(this.device, () => this.getPM2_5Density()));
+      this.airQualityService
+        .getCharacteristic(this.platform.Characteristic.PM10Density)
+        .onGet(() => this.platform.readDevice(this.device, () => this.getPM10Density()));
+      this.airQualityService
+        .getCharacteristic(this.platform.Characteristic.VOCDensity)
+        .onGet(() => this.platform.readDevice(this.device, () => this.getVOCDensity()));
     } else if (this.airQualityService) {
       this.accessory.removeService(this.airQualityService);
     }
@@ -100,7 +147,7 @@ export class AirPurifierAccessory {
       );
       this.temperatureService
         .getCharacteristic(this.platform.Characteristic.CurrentTemperature)
-        .onGet(this.getCurrentTemperature.bind(this));
+        .onGet(() => this.platform.readDevice(this.device, () => this.getCurrentTemperature()));
     } else if (this.temperatureService) {
       this.accessory.removeService(this.temperatureService);
     }
@@ -112,8 +159,8 @@ export class AirPurifierAccessory {
       this.germShieldService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} Germ Shield`);
       this.germShieldService
         .getCharacteristic(this.platform.Characteristic.On)
-        .onGet(this.getGermShield.bind(this))
-        .onSet(this.setGermShield.bind(this));
+        .onGet(() => this.platform.readDevice(this.device, () => this.getGermShield()))
+        .onSet((value) => this.platform.executeCommand(this.device, () => this.setGermShield(value)));
     } else if (this.germShieldService) {
       this.accessory.removeService(this.germShieldService);
     }
@@ -125,13 +172,21 @@ export class AirPurifierAccessory {
       this.nightModeService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} Night Mode`);
       this.nightModeService
         .getCharacteristic(this.platform.Characteristic.On)
-        .onGet(this.getNightMode.bind(this))
-        .onSet(this.setNightMode.bind(this));
+        .onGet(() => this.platform.readDevice(this.device, () => this.getNightMode()))
+        .onSet((value) => this.platform.executeCommand(this.device, () => this.setNightMode(value)));
     } else if (this.nightModeService) {
       this.accessory.removeService(this.nightModeService);
     }
 
     this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
+    if (this.platform.onDemand) {
+      // Without a periodic poll, publish the initial snapshot now. updateCharacteristic
+      // changes HomeKit's cache without calling a SET handler or writing to Blueair.
+      this.service.updateCharacteristic(this.platform.Characteristic.Active, this.getActive());
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, this.getTargetAirPurifierState());
+      this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
+    }
   }
 
   updateCharacteristics(changedStates: Partial<FullBlueAirDeviceState>) {
@@ -208,7 +263,13 @@ export class AirPurifierAccessory {
 
   async setActive(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting active to ${value}`);
+    const waking = value === this.platform.Characteristic.Active.ACTIVE && this.device.state.standby === true;
+    const preset = this.device.state.apsubmode;
     await this.device.setState('standby', value === this.platform.Characteristic.Active.INACTIVE);
+    if (this.platform.onDemand && waking && this.device.deviceType === BlueAirDeviceType.BLUE_SIGNATURE && preset !== undefined) {
+      // Reapply the prior preset even if cloud state still reports it after waking.
+      await this.device.setState('apsubmode', preset, true);
+    }
   }
 
   getCurrentAirPurifierState(): CharacteristicValue {
@@ -232,7 +293,11 @@ export class AirPurifierAccessory {
     const { attribute, value: attributeValue } = this.autoModeStrategy.setAuto(
       value === this.platform.Characteristic.TargetAirPurifierState.AUTO,
     );
-    await this.device.setState(attribute, attributeValue);
+    await this.device.setState(
+      attribute,
+      attributeValue,
+      this.platform.onDemand && this.device.deviceType === BlueAirDeviceType.BLUE_SIGNATURE,
+    );
   }
 
   getLockPhysicalControls(): CharacteristicValue {
@@ -247,20 +312,52 @@ export class AirPurifierAccessory {
   }
 
   getRotationSpeed(): CharacteristicValue {
-    return this.device.state.standby === false ? this.device.state.fanspeed || 0 : 0;
+    if (!this.platform.onDemand) {
+      return this.device.state.standby === false ? this.device.state.fanspeed || 0 : 0;
+    }
+    // Active represents power; retain the configured speed while in standby.
+    return this.queuedSpeed ?? (this.device.state.fanspeed || 0);
+  }
+
+  queueRotationSpeed(value: CharacteristicValue): void {
+    const request = ++this.speedRequest;
+    this.queuedSpeed = value;
+    this.platform.log.debug(`[${this.device.name}] Queued HomeKit speed: ${value}; waiting for slider to settle`);
+    // Acknowledge queue acceptance immediately; cloud completion is handled separately.
+    void this.speedControl
+      .set(value)
+      .then(() => {
+        if (request === this.speedRequest) {
+          this.queuedSpeed = undefined;
+          this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
+          this.platform.log.debug(`[${this.device.name}] Queued speed completed; reported speed: ${this.device.state.fanspeed}`);
+        }
+      })
+      .catch((error: unknown) => {
+        if (request === this.speedRequest) {
+          this.queuedSpeed = undefined;
+          this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getRotationSpeed());
+          this.platform.log.warn(
+            `[${this.device.name}] Queued speed failed: ${String(error)}; restored last reported speed ${this.device.state.fanspeed}`,
+          );
+        }
+      });
   }
 
   async setRotationSpeed(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting rotation speed to ${value}`);
 
     const speed = value as number;
-    if (speed > 0 && this.device.state.standby === true) {
+    const waking = speed > 0 && this.device.state.standby === true;
+    if (waking) {
       await this.device.setState('standby', false);
     }
 
-    const manualMode = this.autoModeStrategy.setAuto(false);
-    if (speed > 0 && manualMode.attribute in this.device.state && this.device.state[manualMode.attribute] !== manualMode.value) {
-      await this.device.setState(manualMode.attribute, manualMode.value);
+    const { attribute, value: manualValue } = this.autoModeStrategy.setAuto(false);
+    const forceSignature = this.platform.onDemand && this.device.deviceType === BlueAirDeviceType.BLUE_SIGNATURE;
+    const reapplyAfterWake = waking && forceSignature;
+    if (speed > 0 && attribute in this.device.state && (this.device.state[attribute] !== manualValue || reapplyAfterWake)) {
+      await this.device.setState(attribute, manualValue, forceSignature);
     }
 
     await this.device.setState('fanspeed', speed);

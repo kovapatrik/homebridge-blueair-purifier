@@ -57,6 +57,9 @@ export interface BlueAirDevice {
 export class BlueAirDevice extends EventEmitter {
   public state: BlueAirDeviceState;
   public sensorData: BlueAirSensorDataWithAqi;
+  // Installed only in on-demand mode. The platform owns serialization and
+  // read-back verification; otherwise the original setState event path is used.
+  public stateWriter?: (attribute: string, value: number | boolean) => Promise<void>;
 
   public readonly id: string;
   public readonly name: string;
@@ -126,12 +129,17 @@ export class BlueAirDevice extends EventEmitter {
     release();
   }
 
-  public async setState(attribute: string, value: number | boolean) {
+  public async setState(attribute: string, value: number | boolean, force = false) {
     if (attribute in this.state === false) {
       throw new Error(`Invalid state: ${attribute}`);
     }
 
-    if (this.state[attribute] === value) {
+    if (!force && this.state[attribute] === value) {
+      return;
+    }
+
+    if (this.stateWriter) {
+      await this.stateWriter(attribute, value);
       return;
     }
 
@@ -163,7 +171,7 @@ export class BlueAirDevice extends EventEmitter {
     await this.setState('brightness', brightness);
   }
 
-  private async updateState(newState: BlueAirDeviceStatus) {
+  public async updateState(newState: BlueAirDeviceStatus) {
     const changedState: Partial<BlueAirDeviceState> = {};
     const changedSensorData: Partial<BlueAirSensorDataWithAqi> = {};
 

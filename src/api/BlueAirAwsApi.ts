@@ -73,7 +73,14 @@ export const BlueAirDeviceSensorDataMap: Record<string, keyof BlueAirDeviceSenso
   tVOC: 'voc',
 };
 
+export class BlueAirRateLimitError extends Error {}
+
 export default class BlueAirAwsApi {
+  // One cooldown per client, shared by all its devices and API endpoints.
+  // This is deliberately common to both polling modes: a server throttle must
+  // not trigger the ordinary immediate retry loop or more concurrent requests.
+  private cooldownUntil = 0;
+  private rateLimitDelay = 30000;
   private readonly gigyaApi: GigyaApi;
 
   private last_login: number;
@@ -109,6 +116,7 @@ export default class BlueAirAwsApi {
   }
 
   async login(): Promise<void> {
+    this.checkCooldown();
     this.logger.debug('Logging in...');
 
     const { token, secret } = await this.gigyaApi.getGigyaSession();
@@ -285,7 +293,7 @@ export default class BlueAirAwsApi {
   async setDeviceStatus(uuid: string, state: string, value: number | boolean): Promise<void> {
     await this.checkTokenExpiration();
 
-    // this.logger.debug(`setDeviceStatus: ${uuid} ${state} ${value}`);
+    this.logger.debug(`[${uuid}] Sending device command: ${state} = ${value}`);
 
     const body: BlueAirSetStateBody = {
       n: state,
@@ -329,9 +337,29 @@ export default class BlueAirAwsApi {
     };
   }
 
+  getCooldownRemaining(): number {
+    return Math.max(0, this.cooldownUntil - Date.now());
+  }
+
+  private checkCooldown() {
+    if (Date.now() < this.cooldownUntil) {
+      throw new BlueAirRateLimitError(
+        `Blueair rate limited requests; try again in ${Math.ceil((this.cooldownUntil - Date.now()) / 1000)} seconds`,
+      );
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async apiCall<T = any>(url: string, data?: string | object, method = 'POST', headers?: object, retries = 3): Promise<T> {
     const release = await this.mutex.acquire();
+    try {
+      // Check after acquiring the lock so callers queued behind a throttled
+      // request stop locally, before fetch. Do not sleep while holding the lock.
+      this.checkCooldown();
+    } catch (error) {
+      release();
+      throw error;
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
     this.logger.debug(`[AWS] apiCall request: ${method} ${this.blueAirApiUrl}${url}, body: ${JSON.stringify(data)}`);
@@ -349,13 +377,34 @@ export default class BlueAirAwsApi {
         body: JSON.stringify(data),
         signal: controller.signal,
       });
+      if (response.status === 229 || response.status === 429) {
+        // Blueair has returned 229 without Retry-After in real-device testing.
+        // Accept either standard header form, using exponential backoff when
+        // it is absent/invalid. A longer server delay takes precedence over our cap.
+        const retryAfter = response.headers.get('retry-after');
+        const seconds = retryAfter === null ? NaN : Number(retryAfter);
+        const serverDelay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter ?? '') - Date.now();
+        const delay = Math.max(this.rateLimitDelay, Number.isFinite(serverDelay) ? serverDelay : 0);
+        this.cooldownUntil = Date.now() + delay;
+        this.rateLimitDelay = Math.min(this.rateLimitDelay * 2, 300000);
+        this.logger.warn(
+          `Blueair rate limit (${response.status}); Retry-After=${retryAfter === null ? 'absent' : JSON.stringify(retryAfter)}; ` +
+            `pausing cloud requests for ${Math.ceil(delay / 1000)} seconds`,
+        );
+        void response.body?.cancel().catch(() => undefined);
+        this.checkCooldown();
+      }
       const json = await response.json();
       this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
       if (response.status !== 200) {
         throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
       }
+      this.rateLimitDelay = 30000;
       return json as T;
     } catch (error) {
+      if (error instanceof BlueAirRateLimitError) {
+        throw error;
+      }
       if (retries > 0) {
         return this.apiCall(url, data, method, headers, retries - 1);
       } else {
