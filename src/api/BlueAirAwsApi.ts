@@ -1,7 +1,16 @@
 import { Logger } from 'homebridge';
 import { Region } from '../platformUtils';
 import GigyaApi from './GigyaApi';
-import { BLUEAIR_API_TIMEOUT, BlueAirDeviceStatusResponse, BlueAirTelemetryResponse, LOGIN_EXPIRATION, getAwsConfig } from './Consts';
+import {
+  BLUEAIR_API_TIMEOUT,
+  BLUEAIR_RATE_LIMIT_STATUSES,
+  BLUEAIR_RETRY_BASE_MS,
+  BLUEAIR_RETRY_MAX_MS,
+  BlueAirDeviceStatusResponse,
+  BlueAirTelemetryResponse,
+  LOGIN_EXPIRATION,
+  getAwsConfig,
+} from './Consts';
 import { Mutex } from 'async-mutex';
 
 type BlueAirDeviceDiscovery = {
@@ -61,6 +70,23 @@ type BlueAirSetStateBody = {
   v?: number;
   vb?: boolean;
 };
+
+export class RateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function computeBackoffMs(attempt: number): number {
+  const exponential = BLUEAIR_RETRY_BASE_MS * 2 ** attempt;
+  const jitter = Math.floor(Math.random() * BLUEAIR_RETRY_BASE_MS);
+  return Math.min(exponential + jitter, BLUEAIR_RETRY_MAX_MS);
+}
 
 export const BlueAirDeviceSensorDataMap: Record<string, keyof BlueAirDeviceSensorData> = {
   fsp0: 'fanspeed',
@@ -332,41 +358,74 @@ export default class BlueAirAwsApi {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async apiCall<T = any>(url: string, data?: string | object, method = 'POST', headers?: object, retries = 3): Promise<T> {
     const release = await this.mutex.acquire();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
-    this.logger.debug(`[AWS] apiCall request: ${method} ${this.blueAirApiUrl}${url}, body: ${JSON.stringify(data)}`);
     try {
-      const response = await fetch(`${this.blueAirApiUrl}${url}`, {
-        method: method,
-        headers: {
-          Accept: '*/*',
-          Connection: 'keep-alive',
-          'Accept-Encoding': 'gzip, deflate, br',
-          Authorization: `Bearer ${this.accessToken}`,
-          idtoken: this.idToken || this.accessToken,
-          ...headers,
-        },
-        body: JSON.stringify(data),
-        signal: controller.signal,
-      });
-      const json = await response.json();
-      this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
-      if (response.status !== 200) {
-        throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
-      }
-      return json as T;
-    } catch (error) {
-      if (retries > 0) {
-        return this.apiCall(url, data, method, headers, retries - 1);
-      } else {
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error(`API call failed after ${3 - retries} retries with timeout.`);
-        } else {
-          throw new Error(`API call failed after ${3 - retries} retries with error: ${error}`);
+      for (let attempt = 0; ; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
+        this.logger.debug(`[AWS] apiCall request: ${method} ${this.blueAirApiUrl}${url}, body: ${JSON.stringify(data)}`);
+
+        let response: Response;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let json: any;
+        try {
+          response = await fetch(`${this.blueAirApiUrl}${url}`, {
+            method: method,
+            headers: {
+              Accept: '*/*',
+              Connection: 'keep-alive',
+              'Accept-Encoding': 'gzip, deflate, br',
+              Authorization: `Bearer ${this.accessToken}`,
+              idtoken: this.idToken || this.accessToken,
+              ...headers,
+            },
+            body: JSON.stringify(data),
+            signal: controller.signal,
+          });
+          json = await response.json();
+        } catch (error) {
+          clearTimeout(timeout);
+          const err = error as Error;
+          const description = err.name === 'AbortError' ? 'API call timed out' : `API call error: ${err.message}`;
+          if (attempt >= retries) {
+            throw new Error(`${description} (after ${attempt + 1} attempts)`);
+          }
+          const delayMs = computeBackoffMs(attempt);
+          this.logger.debug(`[AWS] ${description} on attempt ${attempt + 1}, retrying in ${delayMs}ms`);
+          await sleep(delayMs);
+          continue;
         }
+        clearTimeout(timeout);
+
+        this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
+
+        if (response.status === 200) {
+          return json as T;
+        }
+
+        const message = `API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`;
+
+        if (BLUEAIR_RATE_LIMIT_STATUSES.has(response.status)) {
+          // Retrying a rate-limit response immediately is what got us throttled in the
+          // first place — and since BlueAir's throttle is account-scoped, every extra
+          // request extends the pain for the user's own mobile app as well. Fail fast;
+          // let the platform-level backoff decide when to try again.
+          throw new RateLimitError(message);
+        }
+
+        if (response.status >= 500) {
+          if (attempt >= retries) {
+            throw new Error(`${message} (after ${attempt + 1} attempts)`);
+          }
+          const delayMs = computeBackoffMs(attempt);
+          this.logger.debug(`[AWS] server error (status ${response.status}) on attempt ${attempt + 1}, retrying in ${delayMs}ms`);
+          await sleep(delayMs);
+          continue;
+        }
+
+        // Non-retryable client error (e.g. 400, 401, 403, 404).
+        throw new Error(message);
       }
     } finally {
-      clearTimeout(timeout);
       release();
     }
   }

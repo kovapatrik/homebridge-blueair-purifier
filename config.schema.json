@@ -52,7 +52,7 @@
       },
       "pollingInterval": {
         "title": "Polling Interval",
-        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 15 seconds (15000 miliseconds).",
+        "description": "Interval in milliseconds to poll the BlueAir API for updates. The plugin automatically backs off when the API returns a rate-limit response (status 229 or 429). Note: BlueAir's rate limit is applied per account, so faster polling from this plugin can trigger throttling that also affects the BlueAir mobile app. For older devices without real-time sensors (Blue 40, Dust Magnet series) the plugin falls back to a 5-minute aggregated telemetry endpoint, so polling those faster than 5 min will not surface fresher sensor readings.",
         "type": "number"
       },
       "devices": {
