@@ -1,6 +1,14 @@
 # Changelog
 
 # v1.1.0
+## [1.2.2](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.2.1...v1.2.2) (2026-10-02)
+
+
+### Bug Fixes
+
+* clamp filter life to HomeKit range ([f43fe46](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/f43fe466de756bfdaf85e8a7b3c827d235bd1dff))
+* clamp filter life to HomeKit range ([4443afb](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/4443afb733b49ed454a3e9d5abe2460ba3cb8393))
+
 ## [1.2.1](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.2.0...v1.2.1) (2026-08-27)
 
 
