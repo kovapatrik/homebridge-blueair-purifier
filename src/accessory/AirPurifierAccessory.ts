@@ -1,9 +1,10 @@
-import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import { Characteristic, CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
 import { AutoModeStrategy, getAutoModeStrategy } from '../device/AutoModeStrategy';
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
+import { COUNTDOWN_TO_CLEAN_AIR_UUID, supportsCountdownToCleanAir } from './CountdownToCleanAir';
 
 export class AirPurifierAccessory {
   private service: Service;
@@ -14,6 +15,7 @@ export class AirPurifierAccessory {
   private germShieldService?: Service;
   private nightModeService?: Service;
   private autoModeStrategy: AutoModeStrategy;
+  private countdownCharacteristic?: Characteristic;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -131,6 +133,23 @@ export class AirPurifierAccessory {
       this.accessory.removeService(this.nightModeService);
     }
 
+    if (this.configDev.countdownToCleanAir && !supportsCountdownToCleanAir(this.device)) {
+      this.platform.log.warn(`[${this.device.name}] Countdown to Clean Air is enabled but the device does not report it, skipping`);
+    }
+
+    if (this.configDev.countdownToCleanAir && this.airQualityService && supportsCountdownToCleanAir(this.device)) {
+      // Register as optional first, otherwise getCharacteristic adds it through HAP's
+      // warning path and logs a characteristic warning on every restart. The optional
+      // list is persisted in the accessory cache, so only add it if it isn't there yet.
+      if (!this.airQualityService.optionalCharacteristics.some((c) => c.UUID === COUNTDOWN_TO_CLEAN_AIR_UUID)) {
+        this.airQualityService.addOptionalCharacteristic(this.platform.CountdownToCleanAir);
+      }
+      this.countdownCharacteristic = this.airQualityService.getCharacteristic(this.platform.CountdownToCleanAir);
+      this.countdownCharacteristic.onGet(this.getCountdownToCleanAir.bind(this));
+    } else if (this.airQualityService?.testCharacteristic(this.platform.CountdownToCleanAir)) {
+      this.airQualityService.removeCharacteristic(this.airQualityService.getCharacteristic(this.platform.CountdownToCleanAir));
+    }
+
     this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
   }
 
@@ -183,6 +202,11 @@ export class AirPurifierAccessory {
           break;
         case 'nightmode':
           this.nightModeService?.updateCharacteristic(this.platform.Characteristic.On, this.getNightMode());
+          break;
+        case 'aireta':
+          if (this.countdownCharacteristic) {
+            this.countdownCharacteristic.updateValue(this.getCountdownToCleanAir());
+          }
           break;
       }
 
@@ -344,5 +368,10 @@ export class AirPurifierAccessory {
   async setNightMode(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting night mode to ${value}`);
     await this.device.setState('nightmode', value as boolean);
+  }
+
+  getCountdownToCleanAir(): CharacteristicValue {
+    const value = Number(this.device.state.aireta) || 0;
+    return Math.max(0, Math.min(1440, value));
   }
 }
