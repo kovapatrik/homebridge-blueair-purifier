@@ -14,7 +14,7 @@ export default class GigyaApi {
   ) {
     const config = getGigyaConfig(region);
 
-    this.logger.debug(`Creating Gigya API instance with config: ${JSON.stringify(config)} and username: ${username} and region: ${region}`);
+    this.logger.debug(`Creating Gigya API instance for region: ${region}`);
 
     this.api_key = config.apiKey;
     this.gigyaApiUrl = `https://accounts.${config.gigyaRegion}.gigya.com`;
@@ -31,7 +31,7 @@ export default class GigyaApi {
     const response = await this.apiCall('/accounts.login', params.toString());
 
     if (!response.sessionInfo) {
-      throw new Error(`Gigya session error: sessionInfo in response: ${JSON.stringify(response)}`);
+      throw new Error('Gigya session error: missing sessionInfo');
     }
 
     this.logger.debug('Gigya session received');
@@ -51,7 +51,7 @@ export default class GigyaApi {
     const response = await this.apiCall('/accounts.getJWT', params.toString());
 
     if (!response.id_token) {
-      throw new Error(`Gigya JWT error: no id_token in response: ${JSON.stringify(response)}`);
+      throw new Error('Gigya JWT error: missing id_token');
     }
 
     this.logger.debug('Gigya JWT received');
@@ -76,7 +76,7 @@ export default class GigyaApi {
       });
       const json = await response.json();
       if (response.status !== 200) {
-        throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
+        throw new Error(`API call error with status ${response.status}: ${response.statusText}`);
       }
       return json;
     } catch (error) {
