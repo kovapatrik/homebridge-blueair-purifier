@@ -97,8 +97,7 @@ export default class BlueAirAwsApi {
 
     this.mutex = new Mutex();
 
-    this.logger.debug(`Creating BlueAir API instance with config: ${JSON.stringify(config)} and username: ${username}\
-    and auth region: ${region}, cloud region: ${cloudRegion}`);
+    this.logger.debug(`Creating BlueAir API instance for auth region: ${region}, cloud region: ${cloudRegion}`);
 
     this.gigyaApi = new GigyaApi(username, password, region, logger);
 
@@ -313,7 +312,7 @@ export default class BlueAirAwsApi {
     });
 
     if (!response.access_token) {
-      throw new Error(`AWS access token error: ${JSON.stringify(response)}`);
+      throw new Error('AWS access token error: missing access_token');
     }
 
     const accessToken = response.access_token as string;
@@ -334,7 +333,7 @@ export default class BlueAirAwsApi {
     const release = await this.mutex.acquire();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), BLUEAIR_API_TIMEOUT);
-    this.logger.debug(`[AWS] apiCall request: ${method} ${this.blueAirApiUrl}${url}, body: ${JSON.stringify(data)}`);
+    this.logger.debug(`[AWS] apiCall request: ${method} ${url}`);
     try {
       const response = await fetch(`${this.blueAirApiUrl}${url}`, {
         method: method,
@@ -350,9 +349,9 @@ export default class BlueAirAwsApi {
         signal: controller.signal,
       });
       const json = await response.json();
-      this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
+      this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}`);
       if (response.status !== 200) {
-        throw new Error(`API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`);
+        throw new Error(`API call error with status ${response.status}: ${response.statusText}`);
       }
       return json as T;
     } catch (error) {
