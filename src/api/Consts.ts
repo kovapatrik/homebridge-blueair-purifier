@@ -59,6 +59,11 @@ export function getGigyaConfig(region: Region): GigyaConfigValue {
 export const LOGIN_EXPIRATION = 3600 * 1000 * 24; // n hours in milliseconds
 export const BLUEAIR_API_TIMEOUT = 5 * 1000; // n seconds in milliseconds
 
+export const BLUEAIR_RETRY_BASE_MS = 1000;
+export const BLUEAIR_RETRY_MAX_MS = 30 * 1000;
+// 229 is the non-standard status the BlueAir AWS API returns for "too many calls".
+export const BLUEAIR_RATE_LIMIT_STATUSES: ReadonlySet<number> = new Set([229, 429]);
+
 export type BlueAirDeviceStatusResponse = {
   deviceInfo: {
     id: string;
