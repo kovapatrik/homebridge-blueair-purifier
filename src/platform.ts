@@ -4,6 +4,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { Config, defaultConfig } from './platformUtils';
 import { defaultsDeep } from 'lodash';
 import BlueAirAwsApi, { BlueAirDeviceStatus } from './api/BlueAirAwsApi';
+import { CountdownToCleanAir, createCountdownToCleanAir } from './accessory/CountdownToCleanAir';
 import { BlueAirDevice } from './device/BlueAirDevice';
 import { AirPurifierAccessory } from './accessory/AirPurifierAccessory';
 import EventEmitter from 'events';
@@ -11,6 +12,7 @@ import EventEmitter from 'events';
 export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
+  public readonly CountdownToCleanAir: CountdownToCleanAir;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -31,6 +33,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     super();
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
+    this.CountdownToCleanAir = createCountdownToCleanAir(api);
 
     this.platformConfig = defaultsDeep(config, defaultConfig);
     this.log.debug('Finished initializing platform:', this.platformConfig.name);
