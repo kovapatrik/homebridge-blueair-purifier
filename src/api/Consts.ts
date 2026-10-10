@@ -59,6 +59,11 @@ export function getGigyaConfig(region: Region): GigyaConfigValue {
 export const LOGIN_EXPIRATION = 3600 * 1000 * 24; // n hours in milliseconds
 export const BLUEAIR_API_TIMEOUT = 5 * 1000; // n seconds in milliseconds
 
+// The telemetry endpoint aggregates readings into 5 minute buckets, so asking for it
+// more often than that returns the same numbers while still counting towards the
+// account's API rate limit.
+export const TELEMETRY_CACHE_TTL = 5 * 60 * 1000;
+
 export type BlueAirDeviceStatusResponse = {
   deviceInfo: {
     id: string;

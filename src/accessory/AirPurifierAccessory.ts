@@ -5,6 +5,8 @@ import { AutoModeStrategy, getAutoModeStrategy } from '../device/AutoModeStrateg
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
 
+const VOC_DENSITY_MAX = 5500;
+
 export class AirPurifierAccessory {
   private service: Service;
   private filterMaintenanceService?: Service;
@@ -86,7 +88,14 @@ export class AirPurifierAccessory {
       this.airQualityService.getCharacteristic(this.platform.Characteristic.AirQuality).onGet(this.getAirQuality.bind(this));
       this.airQualityService.getCharacteristic(this.platform.Characteristic.PM2_5Density).onGet(this.getPM2_5Density.bind(this));
       this.airQualityService.getCharacteristic(this.platform.Characteristic.PM10Density).onGet(this.getPM10Density.bind(this));
-      this.airQualityService.getCharacteristic(this.platform.Characteristic.VOCDensity).onGet(this.getVOCDensity.bind(this));
+      this.airQualityService
+        .getCharacteristic(this.platform.Characteristic.VOCDensity)
+        // BlueAir reports tVOC in ppb and readings above HomeKit's default ceiling of
+        // 1000 are ordinary, so leaving the default in place both clipped the value and
+        // logged a warning on every poll. VOC_DENSITY_MAX is the top of the VOC band
+        // table, above which the air quality figure is pinned anyway.
+        .setProps({ maxValue: VOC_DENSITY_MAX })
+        .onGet(this.getVOCDensity.bind(this));
     } else if (this.airQualityService) {
       this.accessory.removeService(this.airQualityService);
     }
@@ -307,7 +316,7 @@ export class AirPurifierAccessory {
   }
 
   getVOCDensity(): CharacteristicValue {
-    return this.device.sensorData.voc || 0;
+    return Math.min(this.device.sensorData.voc || 0, VOC_DENSITY_MAX);
   }
 
   getAirQuality(): CharacteristicValue {

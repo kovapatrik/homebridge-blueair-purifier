@@ -31,6 +31,7 @@
     "lint": "eslint . --cache --ext .ts",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
+    "test": "npm run build && node --test test/*.cjs",
     "prepublishOnly": "npm run lint && npm run build",
     "format": "prettier --log-level warn --write \"**/*.ts\" && npm run lint -- --fix"
   },
