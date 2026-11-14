@@ -3,10 +3,14 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { Config, defaultConfig } from './platformUtils';
 import { defaultsDeep } from 'lodash';
-import BlueAirAwsApi, { BlueAirDeviceStatus } from './api/BlueAirAwsApi';
+import BlueAirAwsApi, { BlueAirDeviceStatus, RateLimitError } from './api/BlueAirAwsApi';
 import { BlueAirDevice } from './device/BlueAirDevice';
 import { AirPurifierAccessory } from './accessory/AirPurifierAccessory';
 import EventEmitter from 'events';
+
+// Absolute ceiling on the polling backoff. Prevents the plugin from going silent for
+// hours at large pollingInterval bases (e.g. 5 min * 16 = 80 min without this cap).
+const MAX_POLL_BACKOFF_MS = 30 * 60 * 1000;
 
 export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
@@ -22,6 +26,7 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
 
   private devices: BlueAirDevice[] = [];
   private polling: NodeJS.Timeout | null = null;
+  private consecutiveRateLimitFailures = 0;
 
   constructor(
     public readonly log: Logger,
@@ -50,16 +55,61 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       this.platformConfig.cloudRegion ?? this.platformConfig.region,
     );
 
-    this.api.on('didFinishLaunching', async () => {
-      await this.getInitialDeviceStates();
-
-      this.getValidDevicesStatus();
+    this.api.on('didFinishLaunching', () => {
+      this.initializeAndStartPolling();
     });
   }
 
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
     this.accessories.push(accessory);
+  }
+
+  // Exponential backoff of the outer poll on repeated rate-limits: 1x, 2x, 4x, 8x, ...
+  // Ceiling is the absolute MAX_POLL_BACKOFF_MS rather than a multiplier cap, so the
+  // max silence is the same (~30 min) regardless of pollingInterval. Letting the counter
+  // grow unbounded also makes decay-on-success a proper gradual ramp — a long jail
+  // requires proportionally many successful polls to fully recover.
+  private computeBackoffDelayMs(): number {
+    const multiplier = 2 ** this.consecutiveRateLimitFailures;
+    return Math.min(this.platformConfig.pollingInterval * multiplier, MAX_POLL_BACKOFF_MS);
+  }
+
+  private decayRateLimitCounter() {
+    // Decay on success rather than reset so a single lucky request doesn't immediately
+    // put us back at the configured cadence and re-trip the throttle.
+    this.consecutiveRateLimitFailures = Math.max(0, this.consecutiveRateLimitFailures - 1);
+  }
+
+  private schedulePoll(delayMs: number) {
+    // Always clear first: a concurrent setState / in-flight poll may have scheduled its own
+    // timer. Without this, both timers stay active and create parallel polling loops.
+    if (this.polling) {
+      clearTimeout(this.polling);
+    }
+    this.polling = setTimeout(this.getValidDevicesStatus.bind(this), delayMs);
+  }
+
+  private async initializeAndStartPolling() {
+    try {
+      await this.getInitialDeviceStates();
+      this.decayRateLimitCounter();
+      // The initial fetch already returned fresh states, so don't fire a second
+      // /r/initial request immediately — wait one (backed-off) interval.
+      this.schedulePoll(this.computeBackoffDelayMs());
+    } catch (error) {
+      // Any startup failure (rate-limit, network, 5xx, auth) is retried with backoff.
+      // Otherwise the plugin would start polling with no devices registered and never recover.
+      this.consecutiveRateLimitFailures++;
+      const delayMs = this.computeBackoffDelayMs();
+      const reason = error instanceof RateLimitError ? 'Rate-limited during initial device fetch' : 'Error during initial device fetch';
+      this.log.warn(`${reason}: ${(error as Error).message}. Retrying initialization in ${delayMs}ms...`);
+      this.log.debug('Error stack:', (error as Error).stack);
+      if (this.polling) {
+        clearTimeout(this.polling);
+      }
+      this.polling = setTimeout(() => this.initializeAndStartPolling(), delayMs);
+    }
   }
 
   async getValidDevicesStatus() {
@@ -76,36 +126,39 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
         blueAirDevice.emit('update', device);
       }
       this.log.debug('Devices states updated!');
+      this.decayRateLimitCounter();
     } catch (error) {
       const err = error as Error;
-      this.log.warn('Error getting valid devices status, reason:' + err.message + '. Retrying in 5 seconds...');
+      if (error instanceof RateLimitError) {
+        this.consecutiveRateLimitFailures++;
+      }
+      this.log.warn(`Error getting valid devices status, reason: ${err.message}. Retrying in ${this.computeBackoffDelayMs()}ms...`);
       this.log.debug('Error stack:', err.stack);
-    } finally {
-      this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
     }
+    // Next poll honors the current backoff on both success (after decay) and failure.
+    this.schedulePoll(this.computeBackoffDelayMs());
   }
 
+  // Throws on failure; initializeAndStartPolling logs and applies the backoff.
   async getInitialDeviceStates() {
     this.log.info('Getting initial device states...');
-    try {
-      await this.blueAirApi.login();
-      let uuids = this.platformConfig.devices.map((device) => device.id);
-      const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, uuids);
+    // Only log in if we don't already hold a valid token (e.g. on an init retry after a
+    // rate-limit), to avoid spending extra API calls against the account-wide throttle.
+    await this.blueAirApi.checkTokenExpiration();
+    let uuids = this.platformConfig.devices.map((device) => device.id);
+    const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, uuids);
 
-      for (const device of devices) {
-        this.addDevice(device);
-        uuids = uuids.filter((uuid) => uuid !== device.id);
-      }
-
-      for (const uuid of uuids) {
-        const device = this.platformConfig.devices.find((device) => device.id === uuid)!;
-        this.log.warn(`[${device.name}] Device not found in AWS API response!`);
-      }
-
-      this.log.info('All configured devices have been added!');
-    } catch (error) {
-      this.log.error('Error getting initial device states:', error);
+    for (const device of devices) {
+      this.addDevice(device);
+      uuids = uuids.filter((uuid) => uuid !== device.id);
     }
+
+    for (const uuid of uuids) {
+      const device = this.platformConfig.devices.find((device) => device.id === uuid)!;
+      this.log.warn(`[${device.name}] Device not found in AWS API response!`);
+    }
+
+    this.log.info('All configured devices have been added!');
   }
 
   async addDevice(device: BlueAirDeviceStatus) {
@@ -132,13 +185,16 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       try {
         await this.blueAirApi.setDeviceStatus(id, attribute, value);
         success = true;
+        this.decayRateLimitCounter();
       } catch (error) {
+        if (error instanceof RateLimitError) {
+          this.consecutiveRateLimitFailures++;
+        }
         this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
       } finally {
         blueAirDevice.emit('setStateDone', success);
-        // Have to clear polling again to avoid conflicts
-        this.polling && clearTimeout(this.polling);
-        this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
+        // Respect the current backoff instead of snapping back to the base interval.
+        this.schedulePoll(this.computeBackoffDelayMs());
       }
     });
 
