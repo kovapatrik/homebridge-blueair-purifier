@@ -50,9 +50,18 @@
         "description": "Enable to show debug information in the Homebridge UI.",
         "type": "boolean"
       },
+      "sliderBufferMs": {
+        "title": "Slider Buffer (milliseconds)",
+        "description": "Only used when Polling Interval is 0. Wait after the latest fan-speed adjustment before sending it. Default: 2000 (2 seconds). Each adjustment resets the window. 0 disables the waiting period; shorter windows may increase cloud traffic. Restart the child bridge after changing this setting.",
+        "type": "integer",
+        "default": 2000,
+        "minimum": 0,
+        "maximum": 30000
+      },
       "pollingInterval": {
         "title": "Polling Interval",
-        "description": "Interval in miliseconds to poll the BlueAir API for updates. It's recommended to keep this at least 15 seconds (15000 miliseconds).",
+        "description": "Polling interval in milliseconds. Set to 0 to refresh on HomeKit reads (15-second cache), refresh before control actions, and verify writes afterward, without periodic polling. For periodic polling, at least 15000 milliseconds is recommended.",
+        "minimum": 0,
         "type": "number"
       },
       "devices": {
@@ -123,7 +132,7 @@
           "expandable": true,
           "expanded": true,
           "title": "Common Settings",
-          "items": ["name", "username", "password", "region", "cloudRegion", "accountUuid", "verboseLogging", "uiDebug", "pollingInterval"]
+          "items": ["name", "username", "password", "region", "cloudRegion", "accountUuid", "verboseLogging", "uiDebug", "pollingInterval", "sliderBufferMs"]
         },
         {
           "key": "devices",

@@ -28,6 +28,7 @@
   },
   "main": "dist/index.js",
   "scripts": {
+    "test": "npm run build && node --test test/*.cjs",
     "lint": "eslint . --cache --ext .ts",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
