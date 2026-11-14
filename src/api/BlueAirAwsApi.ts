@@ -42,6 +42,13 @@ export type BlueAirDeviceState = {
   filterusage?: number;
   disinfection?: boolean;
   disinftime?: number;
+  // 2-in-1 Purify + Humidify combos
+  mode?: number;
+  hummode?: boolean;
+  autorh?: number;
+  nlbrightness?: number;
+  wlevel?: number;
+  wshortage?: boolean;
   [key: string]: string | number | boolean | undefined;
 };
 

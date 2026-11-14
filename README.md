@@ -51,6 +51,9 @@ This plugin only supports WiFi connected BlueAir purifiers utilizing cloud conne
 * Show Temperature Sensor service
 * Show Germ Shield switch service
 * Show Night Mode switch service
+* Show Humidifier service (2-in-1 Purify + Humidify only: humidification on/off, target humidity, water level)
+* Show DermaSense mode switch service (2-in-1 Purify + Humidify only)
+* Show Mood Light service as a lightbulb (2-in-1 Purify + Humidify only)
 
 ### Customizable Options
 * Adjustable Filter Change Level

@@ -74,7 +74,7 @@ export class BlueAirDevice extends EventEmitter {
     this.id = device.id;
     this.name = device.name;
     this.sku = device.sku;
-    this.deviceType = getDeviceType(device.sku);
+    this.deviceType = getDeviceType(device.sku, device.state);
 
     this.state = device.state;
     this.sensorData = {

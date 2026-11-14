@@ -108,6 +108,21 @@
               "title": "Night Mode",
               "description": "Toggles if the night mode switch service is created with the accessory.",
               "type": "boolean"
+            },
+            "humidifier": {
+              "title": "Humidifier",
+              "description": "2-in-1 Purify + Humidify only. Toggles if the humidifier service (humidification on/off, target humidity, water level) is created with the accessory.",
+              "type": "boolean"
+            },
+            "dermaSense": {
+              "title": "DermaSense Mode",
+              "description": "2-in-1 Purify + Humidify only. Toggles if the DermaSense mode switch service is created with the accessory.",
+              "type": "boolean"
+            },
+            "moodLight": {
+              "title": "Mood Light",
+              "description": "2-in-1 Purify + Humidify only. Toggles if the mood light service is created with the accessory.",
+              "type": "boolean"
             }
           }
         }
@@ -139,7 +154,10 @@
             "devices[].airQualitySensor",
             "devices[].temperatureSensor",
             "devices[].germShield",
-            "devices[].nightMode"
+            "devices[].nightMode",
+            "devices[].humidifier",
+            "devices[].dermaSense",
+            "devices[].moodLight"
           ]
         }
       ]

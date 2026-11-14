@@ -1,7 +1,8 @@
 import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 import { BlueAirPlatform } from '../platform';
 import { BlueAirDevice } from '../device/BlueAirDevice';
-import { AutoModeStrategy, getAutoModeStrategy } from '../device/AutoModeStrategy';
+import { AutoModeStrategy, COMBO_MODE, getAutoModeStrategy } from '../device/AutoModeStrategy';
+import { BlueAirDeviceType, getMaxFanSpeed } from '../device/BlueAirDeviceType';
 import { DeviceConfig } from '../platformUtils';
 import { FullBlueAirDeviceState } from '../api/BlueAirAwsApi';
 
@@ -13,7 +14,13 @@ export class AirPurifierAccessory {
   private temperatureService?: Service;
   private germShieldService?: Service;
   private nightModeService?: Service;
+  private humidifierService?: Service;
+  private dermaSenseService?: Service;
+  private moodLightService?: Service;
   private autoModeStrategy: AutoModeStrategy;
+  private isCombo: boolean;
+  private maxFanSpeed: number;
+  private lastMoodBrightness: number;
 
   constructor(
     protected readonly platform: BlueAirPlatform,
@@ -22,6 +29,9 @@ export class AirPurifierAccessory {
     protected readonly configDev: DeviceConfig,
   ) {
     this.autoModeStrategy = getAutoModeStrategy(this.device.deviceType);
+    this.isCombo = this.device.deviceType === BlueAirDeviceType.COMBO_2IN1;
+    this.maxFanSpeed = getMaxFanSpeed(this.device.deviceType);
+    this.lastMoodBrightness = this.device.state.nlbrightness || 100;
 
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
@@ -131,6 +141,77 @@ export class AirPurifierAccessory {
       this.accessory.removeService(this.nightModeService);
     }
 
+    const comboOnly = (option: string, enabled: boolean) => {
+      if (enabled && !this.isCombo) {
+        this.platform.log.warn(`[${this.device.name}] "${option}" is only supported on 2-in-1 Purify + Humidify devices, ignoring.`);
+      }
+      return enabled && this.isCombo;
+    };
+
+    this.humidifierService = this.accessory.getServiceById(this.platform.Service.HumidifierDehumidifier, 'Humidifier');
+    if (comboOnly('humidifier', this.configDev.humidifier)) {
+      this.humidifierService ??= this.accessory.addService(
+        this.platform.Service.HumidifierDehumidifier,
+        `${this.device.name} Humidifier`,
+        'Humidifier',
+      );
+      this.humidifierService.setCharacteristic(this.platform.Characteristic.Name, `${this.device.name} Humidifier`);
+      this.humidifierService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} Humidifier`);
+      this.humidifierService
+        .getCharacteristic(this.platform.Characteristic.Active)
+        .onGet(this.getHumidifierActive.bind(this))
+        .onSet(this.setHumidifierActive.bind(this));
+      this.humidifierService
+        .getCharacteristic(this.platform.Characteristic.CurrentHumidifierDehumidifierState)
+        .onGet(this.getCurrentHumidifierState.bind(this));
+      this.humidifierService
+        .getCharacteristic(this.platform.Characteristic.TargetHumidifierDehumidifierState)
+        .setProps({ validValues: [this.platform.Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER] })
+        .onGet(() => this.platform.Characteristic.TargetHumidifierDehumidifierState.HUMIDIFIER);
+      this.humidifierService
+        .getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+        .onGet(this.getCurrentRelativeHumidity.bind(this));
+      this.humidifierService
+        .getCharacteristic(this.platform.Characteristic.RelativeHumidityHumidifierThreshold)
+        .onGet(this.getHumidityThreshold.bind(this))
+        .onSet(this.setHumidityThreshold.bind(this));
+      if (this.device.state.wlevel !== undefined) {
+        this.humidifierService.getCharacteristic(this.platform.Characteristic.WaterLevel).onGet(this.getWaterLevel.bind(this));
+      }
+    } else if (this.humidifierService) {
+      this.accessory.removeService(this.humidifierService);
+    }
+
+    this.dermaSenseService = this.accessory.getServiceById(this.platform.Service.Switch, 'DermaSense');
+    if (comboOnly('dermaSense', this.configDev.dermaSense)) {
+      this.dermaSenseService ??= this.accessory.addService(this.platform.Service.Switch, `${this.device.name} DermaSense`, 'DermaSense');
+      this.dermaSenseService.setCharacteristic(this.platform.Characteristic.Name, `${this.device.name} DermaSense`);
+      this.dermaSenseService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} DermaSense`);
+      this.dermaSenseService
+        .getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.getDermaSense.bind(this))
+        .onSet(this.setDermaSense.bind(this));
+    } else if (this.dermaSenseService) {
+      this.accessory.removeService(this.dermaSenseService);
+    }
+
+    this.moodLightService = this.accessory.getServiceById(this.platform.Service.Lightbulb, 'MoodLight');
+    if (comboOnly('moodLight', this.configDev.moodLight)) {
+      this.moodLightService ??= this.accessory.addService(this.platform.Service.Lightbulb, `${this.device.name} Mood Light`, 'MoodLight');
+      this.moodLightService.setCharacteristic(this.platform.Characteristic.Name, `${this.device.name} Mood Light`);
+      this.moodLightService.setCharacteristic(this.platform.Characteristic.ConfiguredName, `${this.device.name} Mood Light`);
+      this.moodLightService
+        .getCharacteristic(this.platform.Characteristic.On)
+        .onGet(this.getMoodLightOn.bind(this))
+        .onSet(this.setMoodLightOn.bind(this));
+      this.moodLightService
+        .getCharacteristic(this.platform.Characteristic.Brightness)
+        .onGet(this.getMoodLightBrightness.bind(this))
+        .onSet(this.setMoodLightBrightness.bind(this));
+    } else if (this.moodLightService) {
+      this.accessory.removeService(this.moodLightService);
+    }
+
     this.device.on('stateUpdated', this.updateCharacteristics.bind(this));
   }
 
@@ -139,9 +220,28 @@ export class AirPurifierAccessory {
       this.platform.log.debug(`[${this.device.name}] ${k} changed to ${v}}`);
       let updateState = false;
       let updateAirQuality = false;
+      let updateHumidifier = false;
       switch (k) {
         case 'standby':
           updateState = true;
+          updateHumidifier = true;
+          break;
+        case 'mode':
+          this.service.updateCharacteristic(this.platform.Characteristic.TargetAirPurifierState, this.getTargetAirPurifierState());
+          this.service.updateCharacteristic(this.platform.Characteristic.CurrentAirPurifierState, this.getCurrentAirPurifierState());
+          this.nightModeService?.updateCharacteristic(this.platform.Characteristic.On, this.getNightMode());
+          this.dermaSenseService?.updateCharacteristic(this.platform.Characteristic.On, this.getDermaSense());
+          break;
+        case 'hummode':
+        case 'autorh':
+        case 'humidity':
+        case 'wlevel':
+        case 'wshortage':
+          updateHumidifier = true;
+          break;
+        case 'nlbrightness':
+          this.moodLightService?.updateCharacteristic(this.platform.Characteristic.On, this.getMoodLightOn());
+          this.moodLightService?.updateCharacteristic(this.platform.Characteristic.Brightness, this.getMoodLightBrightness());
           break;
         case 'automode':
         case 'apsubmode':
@@ -194,6 +294,26 @@ export class AirPurifierAccessory {
         this.ledService?.updateCharacteristic(this.platform.Characteristic.On, this.getLedOn());
         this.germShieldService?.updateCharacteristic(this.platform.Characteristic.On, this.getGermShield());
         this.nightModeService?.updateCharacteristic(this.platform.Characteristic.On, this.getNightMode());
+        this.dermaSenseService?.updateCharacteristic(this.platform.Characteristic.On, this.getDermaSense());
+      }
+
+      if (updateHumidifier && this.humidifierService) {
+        this.humidifierService.updateCharacteristic(this.platform.Characteristic.Active, this.getHumidifierActive());
+        this.humidifierService.updateCharacteristic(
+          this.platform.Characteristic.CurrentHumidifierDehumidifierState,
+          this.getCurrentHumidifierState(),
+        );
+        this.humidifierService.updateCharacteristic(
+          this.platform.Characteristic.CurrentRelativeHumidity,
+          this.getCurrentRelativeHumidity(),
+        );
+        this.humidifierService.updateCharacteristic(
+          this.platform.Characteristic.RelativeHumidityHumidifierThreshold,
+          this.getHumidityThreshold(),
+        );
+        if (this.device.state.wlevel !== undefined) {
+          this.humidifierService.updateCharacteristic(this.platform.Characteristic.WaterLevel, this.getWaterLevel());
+        }
       }
 
       if (updateAirQuality) {
@@ -247,7 +367,11 @@ export class AirPurifierAccessory {
   }
 
   getRotationSpeed(): CharacteristicValue {
-    return this.device.state.standby === false ? this.device.state.fanspeed || 0 : 0;
+    if (this.device.state.standby !== false) {
+      return 0;
+    }
+    const fanspeed = this.device.state.fanspeed || 0;
+    return Math.min(100, Math.round((fanspeed / this.maxFanSpeed) * 100));
   }
 
   async setRotationSpeed(value: CharacteristicValue) {
@@ -263,7 +387,7 @@ export class AirPurifierAccessory {
       await this.device.setState(manualMode.attribute, manualMode.value);
     }
 
-    await this.device.setState('fanspeed', speed);
+    await this.device.setState('fanspeed', Math.round((speed / 100) * this.maxFanSpeed));
   }
 
   getFilterChangeIndication(): CharacteristicValue {
@@ -338,11 +462,110 @@ export class AirPurifierAccessory {
   }
 
   getNightMode(): CharacteristicValue {
+    if (this.isCombo) {
+      return this.device.state.mode === COMBO_MODE.NIGHT;
+    }
     return this.device.state.nightmode === true;
   }
 
   async setNightMode(value: CharacteristicValue) {
     this.platform.log.debug(`[${this.device.name}] Setting night mode to ${value}`);
+    if (this.isCombo) {
+      await this.setComboMode(COMBO_MODE.NIGHT, value as boolean);
+      return;
+    }
     await this.device.setState('nightmode', value as boolean);
+  }
+
+  // Switches a combo preset on (waking the device if needed) or, when switched
+  // off while that preset is active, falls back to manual fan mode.
+  private async setComboMode(mode: number, on: boolean) {
+    if (on) {
+      if (this.device.state.standby === true) {
+        await this.device.setState('standby', false);
+      }
+      await this.device.setState('mode', mode);
+    } else if (this.device.state.mode === mode) {
+      await this.device.setState('mode', COMBO_MODE.MANUAL);
+    }
+  }
+
+  getDermaSense(): CharacteristicValue {
+    return this.device.state.mode === COMBO_MODE.DERMASENSE;
+  }
+
+  async setDermaSense(value: CharacteristicValue) {
+    this.platform.log.debug(`[${this.device.name}] Setting DermaSense to ${value}`);
+    await this.setComboMode(COMBO_MODE.DERMASENSE, value as boolean);
+  }
+
+  getHumidifierActive(): CharacteristicValue {
+    return this.device.state.standby === false && this.device.state.hummode === true
+      ? this.platform.Characteristic.Active.ACTIVE
+      : this.platform.Characteristic.Active.INACTIVE;
+  }
+
+  async setHumidifierActive(value: CharacteristicValue) {
+    this.platform.log.debug(`[${this.device.name}] Setting humidifier active to ${value}`);
+    const active = value === this.platform.Characteristic.Active.ACTIVE;
+    if (active && this.device.state.standby === true) {
+      await this.device.setState('standby', false);
+    }
+    await this.device.setState('hummode', active);
+  }
+
+  getCurrentHumidifierState(): CharacteristicValue {
+    const states = this.platform.Characteristic.CurrentHumidifierDehumidifierState;
+    if (this.getHumidifierActive() !== this.platform.Characteristic.Active.ACTIVE) {
+      return states.INACTIVE;
+    }
+    const { humidity } = this.device.sensorData;
+    const { autorh, wshortage } = this.device.state;
+    if (wshortage === true || (humidity !== undefined && autorh !== undefined && humidity >= autorh)) {
+      return states.IDLE;
+    }
+    return states.HUMIDIFYING;
+  }
+
+  getCurrentRelativeHumidity(): CharacteristicValue {
+    return Math.min(100, Math.max(0, this.device.sensorData.humidity || 0));
+  }
+
+  getHumidityThreshold(): CharacteristicValue {
+    return Math.min(100, Math.max(0, this.device.state.autorh || 0));
+  }
+
+  async setHumidityThreshold(value: CharacteristicValue) {
+    this.platform.log.debug(`[${this.device.name}] Setting target humidity to ${value}`);
+    await this.device.setState('autorh', Math.round(value as number));
+  }
+
+  getWaterLevel(): CharacteristicValue {
+    return Math.min(100, Math.max(0, this.device.state.wlevel || 0));
+  }
+
+  getMoodLightOn(): CharacteristicValue {
+    return (this.device.state.nlbrightness || 0) > 0;
+  }
+
+  async setMoodLightOn(value: CharacteristicValue) {
+    this.platform.log.debug(`[${this.device.name}] Setting mood light on to ${value}`);
+    const current = this.device.state.nlbrightness || 0;
+    if (!value && current > 0) {
+      this.lastMoodBrightness = current;
+    }
+    await this.device.setState('nlbrightness', value ? this.lastMoodBrightness : 0);
+  }
+
+  getMoodLightBrightness(): CharacteristicValue {
+    return this.device.state.nlbrightness || 0;
+  }
+
+  async setMoodLightBrightness(value: CharacteristicValue) {
+    this.platform.log.debug(`[${this.device.name}] Setting mood light brightness to ${value}`);
+    if ((value as number) > 0) {
+      this.lastMoodBrightness = value as number;
+    }
+    await this.device.setState('nlbrightness', value as number);
   }
 }
