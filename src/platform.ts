@@ -94,12 +94,17 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     try {
       await this.getInitialDeviceStates();
       this.decayRateLimitCounter();
-      this.getValidDevicesStatus();
+      // The initial fetch already returned fresh states, so don't fire a second
+      // /r/initial request immediately — wait one (backed-off) interval.
+      this.schedulePoll(this.computeBackoffDelayMs());
     } catch (error) {
-      // Only RateLimitError bubbles out; other errors are swallowed inside getInitialDeviceStates.
+      // Any startup failure (rate-limit, network, 5xx, auth) is retried with backoff.
+      // Otherwise the plugin would start polling with no devices registered and never recover.
       this.consecutiveRateLimitFailures++;
       const delayMs = this.computeBackoffDelayMs();
-      this.log.warn(`Rate-limited during initial device fetch: ${(error as Error).message}. Retrying initialization in ${delayMs}ms...`);
+      const reason = error instanceof RateLimitError ? 'Rate-limited during initial device fetch' : 'Error during initial device fetch';
+      this.log.warn(`${reason}: ${(error as Error).message}. Retrying initialization in ${delayMs}ms...`);
+      this.log.debug('Error stack:', (error as Error).stack);
       if (this.polling) {
         clearTimeout(this.polling);
       }
@@ -134,31 +139,26 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     this.schedulePoll(this.computeBackoffDelayMs());
   }
 
+  // Throws on failure; initializeAndStartPolling logs and applies the backoff.
   async getInitialDeviceStates() {
     this.log.info('Getting initial device states...');
-    try {
-      await this.blueAirApi.login();
-      let uuids = this.platformConfig.devices.map((device) => device.id);
-      const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, uuids);
+    // Only log in if we don't already hold a valid token (e.g. on an init retry after a
+    // rate-limit), to avoid spending extra API calls against the account-wide throttle.
+    await this.blueAirApi.checkTokenExpiration();
+    let uuids = this.platformConfig.devices.map((device) => device.id);
+    const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, uuids);
 
-      for (const device of devices) {
-        this.addDevice(device);
-        uuids = uuids.filter((uuid) => uuid !== device.id);
-      }
-
-      for (const uuid of uuids) {
-        const device = this.platformConfig.devices.find((device) => device.id === uuid)!;
-        this.log.warn(`[${device.name}] Device not found in AWS API response!`);
-      }
-
-      this.log.info('All configured devices have been added!');
-    } catch (error) {
-      if (error instanceof RateLimitError) {
-        // Let initializeAndStartPolling apply the outer backoff.
-        throw error;
-      }
-      this.log.error('Error getting initial device states:', error);
+    for (const device of devices) {
+      this.addDevice(device);
+      uuids = uuids.filter((uuid) => uuid !== device.id);
     }
+
+    for (const uuid of uuids) {
+      const device = this.platformConfig.devices.find((device) => device.id === uuid)!;
+      this.log.warn(`[${device.name}] Device not found in AWS API response!`);
+    }
+
+    this.log.info('All configured devices have been added!');
   }
 
   async addDevice(device: BlueAirDeviceStatus) {
