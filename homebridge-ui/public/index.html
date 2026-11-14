@@ -35,6 +35,22 @@
                 <option value="USA">USA/Canada</option>
               </select>
            </div>
+            <div class="mb-3">
+              <label for="cloudRegion" class="form-label">Cloud Region Override (optional)</label>
+              <select class="form-select" id="cloudRegion">
+                <option value="">Same as Region</option>
+                <option value="Default (all other regions)">Default (all other regions)</option>
+                <option value="Australia">Australia</option>
+                <option value="China">China</option>
+                <option value="Russia">Russia</option>
+                <option value="USA">USA/Canada</option>
+              </select>
+              <div class="form-text">
+                Leave this on "Same as Region" unless discovery finds fewer devices than the BlueAir app shows.
+                Some accounts log in through one region while their devices live in another
+                (e.g. Region USA/Canada with Cloud Region Default).
+              </div>
+           </div>
            <button class="btn btn-primary btn-login" type="submit" id="discoverBtn" style="border: 0;">
              Discover Devices on account
            </button>
@@ -178,6 +194,9 @@
      }
 
      createForm(configSchema, configuration);
+     if (configuration.cloudRegion) {
+       document.getElementById('cloudRegion').value = configuration.cloudRegion;
+     }
      homebridge.hideSpinner();
 
      /*********************************************************************
@@ -189,12 +208,13 @@
        const username = document.getElementById('username').value;
        const password = document.getElementById('password').value;
        const region = document.getElementById('region').value;
+       const cloudRegion = document.getElementById('cloudRegion').value || undefined;
 
        homebridge.showSpinner();
 
        console.info(`Request login...`);
        try {
-          const devices = await homebridge.request('/discover', { username, password, region });
+          const devices = await homebridge.request('/discover', { username, password, region, cloudRegion });
           debugLog(`Discovered devices:\n${JSON.stringify(devices, null, 2)}`);
           const table = document.getElementById('discoverTable').getElementsByTagName('tbody')[0];
           table.innerHTML = '';
@@ -212,6 +232,11 @@
             configuration.username = username;
             configuration.password = password;
             configuration.region = region;
+            if (cloudRegion) {
+              configuration.cloudRegion = cloudRegion;
+            } else {
+              delete configuration.cloudRegion;
+            }
             configuration.accountUuid = accountUuid;
 
             const initialStates = await homebridge.request('/getInitialDeviceStates', { accountUuid, uuids: devices.map((d) => d.uuid) });

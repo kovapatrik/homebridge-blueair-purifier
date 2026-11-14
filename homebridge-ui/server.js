@@ -87,9 +87,9 @@ class UiServer extends HomebridgePluginUiServer {
       };
     });
 
-    this.onRequest('/discover', async ({ username, password, region }) => {
+    this.onRequest('/discover', async ({ username, password, region, cloudRegion }) => {
       try {
-        this.api = new BlueAirAwsApi(username, password, region, this.logger);
+        this.api = new BlueAirAwsApi(username, password, region, this.logger, cloudRegion || region);
         await this.api.login();
         const devices = await this.api.getDevices();
 
