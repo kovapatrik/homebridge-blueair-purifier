@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.2.2...v1.3.0) (2026-11-14)
+
+
+### Features
+
+* add cloud region option for discovery ([#53](https://github.com/kovapatrik/homebridge-blueair-purifier/issues/53)) ([fdda073](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/fdda0735340213e08f565feeb02a09177da96359))
+* support for 2-in-1 ([#54](https://github.com/kovapatrik/homebridge-blueair-purifier/issues/54)) ([47f2bf1](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/47f2bf17a3ec1161affecdbc9116814c40fbc4dc))
+
+
+### Bug Fixes
+
+* keep credentials and tokens out of Blueair logs ([#49](https://github.com/kovapatrik/homebridge-blueair-purifier/issues/49)) ([ea6cc18](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/ea6cc1804bdd7ee59570ef2a4b9098011a0e0dff))
+* recover gracefully from BlueAir rate-limit responses (229/429) ([#43](https://github.com/kovapatrik/homebridge-blueair-purifier/issues/43)) ([d9c5175](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/d9c51750d5a8c0e4e92b3dd2c8a3b189b3a8f64f))
+* update runtime lodash to 4.18.1 ([#50](https://github.com/kovapatrik/homebridge-blueair-purifier/issues/50)) ([3d120c1](https://github.com/kovapatrik/homebridge-blueair-purifier/commit/3d120c1f15c460cf396340af6e4491406208f727))
+
 ## [1.2.2](https://github.com/kovapatrik/homebridge-blueair-purifier/compare/v1.2.1...v1.2.2) (2026-10-02)
 
 
