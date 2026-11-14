@@ -75,12 +75,25 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
     return Math.min(this.platformConfig.pollingInterval * multiplier, MAX_POLL_BACKOFF_MS);
   }
 
+  private decayRateLimitCounter() {
+    // Decay on success rather than reset so a single lucky request doesn't immediately
+    // put us back at the configured cadence and re-trip the throttle.
+    this.consecutiveRateLimitFailures = Math.max(0, this.consecutiveRateLimitFailures - 1);
+  }
+
+  private schedulePoll(delayMs: number) {
+    // Always clear first: a concurrent setState / in-flight poll may have scheduled its own
+    // timer. Without this, both timers stay active and create parallel polling loops.
+    if (this.polling) {
+      clearTimeout(this.polling);
+    }
+    this.polling = setTimeout(this.getValidDevicesStatus.bind(this), delayMs);
+  }
+
   private async initializeAndStartPolling() {
     try {
       await this.getInitialDeviceStates();
-      // Decay on success rather than reset so a single lucky poll doesn't immediately
-      // put us back at the configured cadence and re-trip the throttle.
-      this.consecutiveRateLimitFailures = Math.max(0, this.consecutiveRateLimitFailures - 1);
+      this.decayRateLimitCounter();
       this.getValidDevicesStatus();
     } catch (error) {
       // Only RateLimitError bubbles out; other errors are swallowed inside getInitialDeviceStates.
@@ -96,7 +109,6 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
 
   async getValidDevicesStatus() {
     this.log.debug('Updating devices states...');
-    let nextDelayMs = this.platformConfig.pollingInterval;
     try {
       const devices = await this.blueAirApi.getDeviceStatus(this.platformConfig.accountUuid, this.existingUuids);
       for (const device of devices) {
@@ -109,24 +121,17 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
         blueAirDevice.emit('update', device);
       }
       this.log.debug('Devices states updated!');
-      this.consecutiveRateLimitFailures = Math.max(0, this.consecutiveRateLimitFailures - 1);
+      this.decayRateLimitCounter();
     } catch (error) {
       const err = error as Error;
       if (error instanceof RateLimitError) {
         this.consecutiveRateLimitFailures++;
-        nextDelayMs = this.computeBackoffDelayMs();
       }
-      this.log.warn(`Error getting valid devices status, reason: ${err.message}. Retrying in ${nextDelayMs}ms...`);
+      this.log.warn(`Error getting valid devices status, reason: ${err.message}. Retrying in ${this.computeBackoffDelayMs()}ms...`);
       this.log.debug('Error stack:', err.stack);
-    } finally {
-      // Defensive clear: a concurrent setState may have scheduled its own poll while we
-      // were awaiting the API. Without this, both timers stay active and create parallel
-      // polling loops (visible in logs as two identical warns in the same second).
-      if (this.polling) {
-        clearTimeout(this.polling);
-      }
-      this.polling = setTimeout(this.getValidDevicesStatus.bind(this), nextDelayMs);
     }
+    // Next poll honors the current backoff on both success (after decay) and failure.
+    this.schedulePoll(this.computeBackoffDelayMs());
   }
 
   async getInitialDeviceStates() {
@@ -180,14 +185,16 @@ export class BlueAirPlatform extends EventEmitter implements DynamicPlatformPlug
       try {
         await this.blueAirApi.setDeviceStatus(id, attribute, value);
         success = true;
-        this.consecutiveRateLimitFailures = Math.max(0, this.consecutiveRateLimitFailures - 1);
+        this.decayRateLimitCounter();
       } catch (error) {
+        if (error instanceof RateLimitError) {
+          this.consecutiveRateLimitFailures++;
+        }
         this.log.error(`[${name}] Error setting state: ${attribute} = ${value}`, error);
       } finally {
         blueAirDevice.emit('setStateDone', success);
-        // Have to clear polling again to avoid conflicts
-        this.polling && clearTimeout(this.polling);
-        this.polling = setTimeout(this.getValidDevicesStatus.bind(this), this.platformConfig.pollingInterval);
+        // Respect the current backoff instead of snapping back to the base interval.
+        this.schedulePoll(this.computeBackoffDelayMs());
       }
     });
 
