@@ -368,8 +368,6 @@ export default class BlueAirAwsApi {
         this.logger.debug(`[AWS] apiCall request: ${method} ${url}`);
 
         let response: Response;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let json: any;
         try {
           response = await fetch(`${this.blueAirApiUrl}${url}`, {
             method: method,
@@ -384,7 +382,6 @@ export default class BlueAirAwsApi {
             body: JSON.stringify(data),
             signal: controller.signal,
           });
-          json = await response.json();
         } catch (error) {
           clearTimeout(timeout);
           const err = error as Error;
@@ -397,7 +394,23 @@ export default class BlueAirAwsApi {
           await sleep(delayMs);
           continue;
         }
-        clearTimeout(timeout);
+        // Parse the body separately from the fetch: a rate-limited or 5xx response may have a
+        // non-JSON body, and a parse failure must not be mistaken for a network error (which
+        // would be retried, re-introducing the request storm on 229/429).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let json: any;
+        try {
+          const text = await response.text();
+          try {
+            json = text ? JSON.parse(text) : undefined;
+          } catch {
+            json = text;
+          }
+        } catch {
+          json = undefined;
+        } finally {
+          clearTimeout(timeout);
+        }
 
         this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
 
