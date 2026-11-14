@@ -412,13 +412,13 @@ export default class BlueAirAwsApi {
           clearTimeout(timeout);
         }
 
-        this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}, body: ${JSON.stringify(json)}`);
+        this.logger.debug(`[AWS] apiCall response: ${response.status} ${response.statusText}`);
 
         if (response.status === 200) {
           return json as T;
         }
 
-        const message = `API call error with status ${response.status}: ${response.statusText}, ${JSON.stringify(json)}`;
+        const message = `API call error with status ${response.status}: ${response.statusText}`;
 
         if (BLUEAIR_RATE_LIMIT_STATUSES.has(response.status)) {
           // Retrying a rate-limit response immediately is what got us throttled in the
