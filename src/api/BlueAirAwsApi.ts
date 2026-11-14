@@ -228,6 +228,10 @@ export default class BlueAirAwsApi {
             Object.assign(status.sensorData, telemetry);
             this.logger.debug(`[${status.name}] Sensor data from telemetry: ${JSON.stringify(telemetry)}`);
           } catch (error) {
+            if (error instanceof RateLimitError) {
+              // Surface it so the platform backs off instead of counting this poll as a success.
+              throw error;
+            }
             this.logger.debug(`[${status.name}] Telemetry fallback failed: ${(error as Error).message}`);
           }
         }
